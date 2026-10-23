@@ -34,8 +34,16 @@
     <button class="b-pause" id="btnPause">⏸ Kal-yeo (Spasi)</button>
     <button id="btnSign" class="b-sign">MODE: TAMBAH (+)</button>
     <button id="btnNew" class="b-new">Match Baru</button>
+    <button id="btnSet" class="b-set">⚙ Pengaturan</button>
   </div>
-
+  <!-- Pengaturan -->
+  <div class="op-settings hidden" id="settings">
+    <label>Waktu ronde (detik) <input id="sRound" type="number" min="10"></label>
+    <label>Istirahat (detik) <input id="sRest" type="number" min="0"></label>
+    <label>Batas Gam-jeom / ronde <input id="sGj" type="number" min="1"></label>
+    <label><input id="sGapOn" type="checkbox"> Point gap aktif</label>
+    <label>Selisih point gap <input id="sGap" type="number" min="1"></label>
+  </div>
   <!-- Rekap ronde -->
   <table class="op-table" id="recap"></table>
 
@@ -93,7 +101,13 @@
       $('phase').textContent = names[st.phase];
       $('round').textContent = 'Ronde ' + st.round;
       $('timer').textContent = fmt(st.timeLeft);
-
+      // pengaturan
+      const S = st.settings;
+      setVal('sRound', S.roundTime);
+      setVal('sRest', S.restTime);
+      setVal('sGj', S.gamjeomLimit);
+      setVal('sGap', S.pointGap);
+      if (document.activeElement !== $('sGapOn')) $('sGapOn').checked = S.pointGapOn;
       // tabel rekap
       let rows = '<tr><th>Ronde</th><th>Chung</th><th>GJ</th><th>Hong</th><th>GJ</th><th>Pemenang</th></tr>';
       for (let r = 0; r < 3; r++) {
@@ -143,6 +157,17 @@
         send(last && last.phase === 'running' ? 'pause' : 'start');
       }
     });
+    // ----- pengaturan -----
+    $('btnSet').onclick = () => $('settings').classList.toggle('hidden');
+    for (const id of ['sRound', 'sRest', 'sGj', 'sGapOn', 'sGap']) {
+      $(id).addEventListener('change', () => send('setSettings', {
+        roundTime: Math.max(10, Number($('sRound').value) || 120),
+        restTime: Math.max(0, Number($('sRest').value) || 0),
+        gamjeomLimit: Math.max(1, Number($('sGj').value) || 5),
+        pointGapOn: $('sGapOn').checked,
+        pointGap: Math.max(1, Number($('sGap').value) || 15),
+      }));
+    }
   </script>
 </body>
 </html>

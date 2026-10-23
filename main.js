@@ -1,6 +1,10 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
+const fs = require('fs');
+const path = require('path');
 
 // ===== PENGATURAN (nanti bisa diubah dari layar operator) =====
+// ===== PENGATURAN (tersimpan di file, tetap ada setelah aplikasi ditutup) =====
+const settingsFile = path.join(app.getPath('userData'), 'settings.json');
 const settings = {
   roundTime: 120,    // detik per ronde
   restTime: 60,      // detik istirahat antar ronde
@@ -8,6 +12,10 @@ const settings = {
   pointGapOn: true,
   pointGap: 15,      // selisih poin per ronde (aturan WT: 15)
 };
+try { Object.assign(settings, JSON.parse(fs.readFileSync(settingsFile, 'utf8'))); } catch (e) {}
+function saveSettings() {
+  try { fs.writeFileSync(settingsFile, JSON.stringify(settings)); } catch (e) {}
+}
 
 // ===== STATE PERTANDINGAN =====
 function newMatch() {
@@ -23,6 +31,7 @@ function newMatch() {
     gamjeom: { chung: [0, 0, 0], hong: [0, 0, 0] },
     roundWinner: [null, null, null],
     winner: null,
+    settings,
   };
 }
 let state = newMatch();
@@ -93,7 +102,12 @@ function handle(type, p = {}) {
     case 'superiority': // p = { side } pemenang ronde seri
       if (state.phase === 'superiority') endRound(p.side);
       break;
-
+    case 'setSettings': // p = { roundTime, restTime, gamjeomLimit, pointGapOn, pointGap }
+      Object.assign(settings, p);
+      saveSettings();
+      if (state.phase === 'waiting') state.timeLeft = settings.roundTime;
+      checkRound();
+      break;
     case 'setInfo': // ubah nama peserta, kategori, nomor match
       state.category = p.category;
       state.matchNo = p.matchNo;

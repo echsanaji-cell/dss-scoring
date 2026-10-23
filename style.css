@@ -156,3 +156,12 @@ body.minus .b-sign { background: #c62828 !important; }
 .op-table th, .op-table td { border: 1px solid #444; padding: 6px; }
 .op-table th { background: #2b2b2b; }
 .op-table tr.now td { background: #333; font-weight: 700; }
+/* ===== PENGATURAN OPERATOR ===== */
+.op-settings {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+  margin-top: 12px; padding: 12px; background: #262626; border-radius: 8px;
+}
+.op-settings.hidden { display: none; }
+.op-settings label { display: flex; align-items: center; gap: 8px; }
+.op-settings input[type="number"] { width: 90px; }
+.b-set { background: #37474f !important; }
