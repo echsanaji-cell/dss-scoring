@@ -93,6 +93,13 @@ function handle(type, p = {}) {
     case 'superiority': // p = { side } pemenang ronde seri
       if (state.phase === 'superiority') endRound(p.side);
       break;
+
+    case 'setInfo': // ubah nama peserta, kategori, nomor match
+      state.category = p.category;
+      state.matchNo = p.matchNo;
+      state.chung = { name: p.chungName, country: p.chungCountry };
+      state.hong = { name: p.hongName, country: p.hongCountry };
+      break;
     case 'newMatch':
       state = newMatch();
       break;
@@ -144,10 +151,13 @@ function broadcast() {
 
 ipcMain.handle('getState', () => state);
 ipcMain.on('cmd', (e, type, payload) => handle(type, payload));
-
+ipcMain.on('fullscreen', (e) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  w.setFullScreen(!w.isFullScreen());
+});
 app.whenReady().then(() => {
   createWindow('scoreboard.html');
-  // createWindow('operator.html'); // <- kita aktifkan di langkah berikutnya
+  createWindow('operator.html', { x: 80, y: 60, width: 1100, height: 760 });
 });
 
 app.on('window-all-closed', () => app.quit());

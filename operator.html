@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Operator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="operator" data-phase="waiting">
+
+  <!-- Info pertandingan -->
+  <div class="op-top">
+    <input id="category" placeholder="Kategori (mis. Male -58 kg)">
+    <input id="matchNo" class="short" placeholder="No">
+    <div class="op-status">
+      <span id="phase"></span>
+      <span id="round"></span>
+      <span class="op-timer" id="timer">2:00</span>
+    </div>
+  </div>
+
+  <!-- Dua sisi: dibuat lewat JS di bawah -->
+  <div class="op-main" id="sides"></div>
+
+  <!-- Pilih pemenang ronde jika skor seri -->
+  <div class="sup">
+    <span>Skor seri, pilih pemenang ronde (keputusan juri):</span>
+    <button class="b-chung" data-sup="chung">CHUNG MENANG</button>
+    <button class="b-hong" data-sup="hong">HONG MENANG</button>
+  </div>
+
+  <!-- Kontrol -->
+  <div class="op-controls">
+    <button class="b-start" id="btnStart">▶ Shijak / Kye-sok (Spasi)</button>
+    <button class="b-pause" id="btnPause">⏸ Kal-yeo (Spasi)</button>
+    <button id="btnSign" class="b-sign">MODE: TAMBAH (+)</button>
+    <button id="btnNew" class="b-new">Match Baru</button>
+  </div>
+
+  <!-- Rekap ronde -->
+  <table class="op-table" id="recap"></table>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const $ = (id) => document.getElementById(id);
+    const send = (type, payload) => ipcRenderer.send('cmd', type, payload);
+    const fmt = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    const PTS = [[1, 'Pukulan'], [2, 'Badan'], [3, 'Kepala'], [4, 'Putar Badan'], [6, 'Putar Kepala']];
+
+    let sign = 1;   // +1 = tambah, -1 = kurangi (koreksi)
+    let last = null;
+
+    // ----- bangun tampilan dua sisi -----
+    function sideHTML(s, label) {
+      return `
+      <div class="op-side ${s}">
+        <div class="op-head">${label}</div>
+        <div class="op-info">
+          <input id="${s}Name" placeholder="Nama peserta">
+          <input id="${s}Country" class="short" maxlength="3" placeholder="NEG">
+        </div>
+        <div class="op-score" id="${s}Score">0</div>
+        <div class="op-pts">
+          ${PTS.map(([n, t]) => `<button data-side="${s}" data-pts="${n}">+${n}<small>${t}</small></button>`).join('')}
+        </div>
+        <button class="op-gj" data-gj="${s}">GAM-JEOM: <b id="${s}Gj">0</b></button>
+        <div class="op-wins">Ronde menang: <b id="${s}Wins">0</b></div>
+      </div>`;
+    }
+    $('sides').innerHTML = sideHTML('chung', 'CHUNG (BIRU)') + sideHTML('hong', 'HONG (MERAH)');
+
+    // ----- tampilkan state -----
+    function setVal(id, v) {
+      const el = $(id);
+      if (document.activeElement !== el) el.value = v; // jangan ganggu saat sedang mengetik
+    }
+
+    function render(st) {
+      last = st;
+      const i = st.round - 1;
+      document.body.dataset.phase = st.phase;
+
+      setVal('category', st.category);
+      setVal('matchNo', st.matchNo);
+      for (const s of ['chung', 'hong']) {
+        setVal(s + 'Name', st[s].name);
+        setVal(s + 'Country', st[s].country);
+        $(s + 'Score').textContent = st.points[s][i];
+        $(s + 'Gj').textContent = st.gamjeom[s][i];
+        $(s + 'Wins').textContent = st.roundWinner.filter((x) => x === s).length;
+      }
+
+      const names = { waiting: 'SIAP', running: 'BERJALAN', paused: 'KAL-YEO', rest: 'ISTIRAHAT', superiority: 'SERI (SUPERIORITY)', ended: 'SELESAI' };
+      $('phase').textContent = names[st.phase];
+      $('round').textContent = 'Ronde ' + st.round;
+      $('timer').textContent = fmt(st.timeLeft);
+
+      // tabel rekap
+      let rows = '<tr><th>Ronde</th><th>Chung</th><th>GJ</th><th>Hong</th><th>GJ</th><th>Pemenang</th></tr>';
+      for (let r = 0; r < 3; r++) {
+        const w = st.roundWinner[r];
+        rows += `<tr class="${r === i ? 'now' : ''}"><td>R${r + 1}</td>
+          <td>${st.points.chung[r]}</td><td>${st.gamjeom.chung[r]}</td>
+          <td>${st.points.hong[r]}</td><td>${st.gamjeom.hong[r]}</td>
+          <td>${w ? w.toUpperCase() : '-'}</td></tr>`;
+      }
+      $('recap').innerHTML = rows;
+    }
+
+    ipcRenderer.invoke('getState').then(render);
+    ipcRenderer.on('state', (e, st) => render(st));
+
+    // ----- klik tombol -----
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.pts) send('add', { side: b.dataset.side, pts: sign * Number(b.dataset.pts) });
+      if (b.dataset.gj) send('gamjeom', { side: b.dataset.gj, delta: sign });
+      if (b.dataset.sup) send('superiority', { side: b.dataset.sup });
+    });
+
+    $('btnStart').onclick = () => send('start');
+    $('btnPause').onclick = () => send('pause');
+    $('btnNew').onclick = () => { if (confirm('Mulai pertandingan baru? Skor sekarang akan dihapus.')) send('newMatch'); };
+    $('btnSign').onclick = () => {
+      sign = -sign;
+      $('btnSign').textContent = sign === 1 ? 'MODE: TAMBAH (+)' : 'MODE: KURANGI (−) koreksi';
+      document.body.classList.toggle('minus', sign === -1);
+    };
+
+    // ----- simpan nama/kategori saat selesai diubah -----
+    for (const id of ['category', 'matchNo', 'chungName', 'chungCountry', 'hongName', 'hongCountry']) {
+      $(id).addEventListener('change', () => send('setInfo', {
+        category: $('category').value, matchNo: $('matchNo').value,
+        chungName: $('chungName').value, chungCountry: $('chungCountry').value.toUpperCase(),
+        hongName: $('hongName').value, hongCountry: $('hongCountry').value.toUpperCase(),
+      }));
+    }
+
+    // spasi = start / pause
+    document.addEventListener('keydown', (e) => {
+      if (e.key === ' ' && e.target.tagName !== 'INPUT') {
+        e.preventDefault();
+        send(last && last.phase === 'running' ? 'pause' : 'start');
+      }
+    });
+  </script>
+</body>
+</html>

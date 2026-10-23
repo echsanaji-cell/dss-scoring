@@ -107,6 +107,7 @@
       o: () => send('gamjeom', { side: 'hong', delta: 1 }),
       ' ': () => send(last && last.phase === 'running' ? 'pause' : 'start'),
       n: () => send('newMatch'),
+      f: () => ipcRenderer.send('fullscreen'),
     };
     document.addEventListener('keydown', (e) => {
       const fn = keys[e.key.toLowerCase()];
