@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Scoreboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="scoreboard" data-phase="waiting">
+  <div class="category" id="category"></div>
+
+  <div class="main">
+    <div class="side chung">
+      <div>
+        <div class="name" id="chungName"></div>
+        <div class="country" id="chungCountry"></div>
+      </div>
+      <div class="score" id="chungScore">0</div>
+      <div class="foot">
+        <div class="gj">GAM-JEOM <b id="chungGj">0</b></div>
+        <div class="dots" id="chungDots"></div>
+      </div>
+    </div>
+
+    <div class="center">
+      <div class="label" id="label"></div>
+      <div class="timer" id="timer">2:00</div>
+      <div class="round">ROUND <b id="round">1</b></div>
+    </div>
+
+    <div class="side hong">
+      <div>
+        <div class="name" id="hongName"></div>
+        <div class="country" id="hongCountry"></div>
+      </div>
+      <div class="score" id="hongScore">0</div>
+      <div class="foot">
+        <div class="gj">GAM-JEOM <b id="hongGj">0</b></div>
+        <div class="dots" id="hongDots"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay" class="overlay hidden"></div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const $ = (id) => document.getElementById(id);
+    const fmt = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    let last = null;
+
+    function render(st) {
+      last = st;
+      const i = st.round - 1;
+      document.body.dataset.phase = st.phase;
+      $('category').textContent = st.category;
+
+      for (const s of ['chung', 'hong']) {
+        $(s + 'Name').textContent = st[s].name;
+        $(s + 'Country').textContent = st[s].country;
+        $(s + 'Score').textContent = st.points[s][i];
+        $(s + 'Gj').textContent = st.gamjeom[s][i];
+        const w = st.roundWinner.filter((x) => x === s).length;
+        $(s + 'Dots').innerHTML = [0, 1]
+          .map((n) => `<span class="dot ${n < w ? 'on' : ''}"></span>`)
+          .join('');
+      }
+
+      $('timer').textContent = fmt(st.timeLeft);
+      $('round').textContent = st.round;
+
+      const labels = {
+        waiting: 'MATCH ' + st.matchNo,
+        running: 'MATCH ' + st.matchNo,
+        paused: 'KAL-YEO',
+        rest: 'BREAK TIME',
+        superiority: 'SUPERIORITY',
+        ended: 'MATCH ' + st.matchNo,
+      };
+      $('label').textContent = labels[st.phase];
+
+      const ov = $('overlay');
+      if (st.phase === 'ended') {
+        const w = st[st.winner];
+        ov.className = 'overlay ' + st.winner;
+        ov.innerHTML =
+          `<div class="ov-title">MATCH ${st.matchNo} RESULT</div>` +
+          `<div class="ov-win">WINNER</div>` +
+          `<div class="ov-name">${w.name} (${w.country})</div>`;
+      } else {
+        ov.className = 'overlay hidden';
+      }
+    }
+
+    ipcRenderer.invoke('getState').then(render);
+    ipcRenderer.on('state', (e, st) => render(st));
+
+    // ===== TOMBOL TES SEMENTARA (nanti diganti layar operator) =====
+    const send = (type, payload) => ipcRenderer.send('cmd', type, payload);
+    const keys = {
+      q: () => send('add', { side: 'chung', pts: 1 }),
+      a: () => send('add', { side: 'chung', pts: 2 }),
+      z: () => send('add', { side: 'chung', pts: 3 }),
+      w: () => send('gamjeom', { side: 'chung', delta: 1 }),
+      p: () => send('add', { side: 'hong', pts: 1 }),
+      k: () => send('add', { side: 'hong', pts: 2 }),
+      m: () => send('add', { side: 'hong', pts: 3 }),
+      o: () => send('gamjeom', { side: 'hong', delta: 1 }),
+      ' ': () => send(last && last.phase === 'running' ? 'pause' : 'start'),
+      n: () => send('newMatch'),
+    };
+    document.addEventListener('keydown', (e) => {
+      const fn = keys[e.key.toLowerCase()];
+      if (fn) { e.preventDefault(); fn(); }
+    });
+  </script>
+</body>
+</html>
