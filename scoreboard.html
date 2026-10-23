@@ -65,7 +65,7 @@
           .join('');
       }
 
-      $('timer').textContent = fmt(st.timeLeft);
+      $('timer').textContent = fmt(st.phase === 'kyeshi' ? st.injuryTime : st.timeLeft);
       $('round').textContent = st.round;
 
       const labels = {
@@ -74,6 +74,8 @@
         paused: 'KAL-YEO',
         rest: 'BREAK TIME',
         superiority: 'SUPERIORITY',
+        kyeshi: st.injury === 'doctor' ? 'DOCTOR' : 'KYESHI',
+        test: 'TEST MODE',
         ended: 'MATCH ' + st.matchNo,
       };
       $('label').textContent = labels[st.phase];
@@ -86,6 +88,9 @@
           `<div class="ov-title">MATCH ${st.matchNo} RESULT</div>` +
           `<div class="ov-win">WINNER</div>` +
           `<div class="ov-name">${w.name} (${w.country})</div>`;
+      } else if (st.phase === 'test') {
+        ov.className = 'overlay';
+        ov.innerHTML = `<div class="ov-test">TEST MODE</div>`;
       } else {
         ov.className = 'overlay hidden';
       }

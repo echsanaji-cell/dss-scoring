@@ -27,12 +27,21 @@
     <button class="b-chung" data-sup="chung">CHUNG MENANG</button>
     <button class="b-hong" data-sup="hong">HONG MENANG</button>
   </div>
-
+  <!-- Panel Kyeshi / cedera -->
+  <div class="inj">
+    <span>Kyeshi berjalan. Atlet bisa lanjut, atau tetapkan pemenang jika tidak bisa lanjut:</span>
+    <button id="btnResume" class="b-start">LANJUTKAN</button>
+    <button class="b-chung" data-injwin="chung">CHUNG MENANG</button>
+    <button class="b-hong" data-injwin="hong">HONG MENANG</button>
+  </div>
   <!-- Kontrol -->
   <div class="op-controls">
     <button class="b-start" id="btnStart">▶ Shijak / Kye-sok (Spasi)</button>
     <button class="b-pause" id="btnPause">⏸ Kal-yeo (Spasi)</button>
     <button id="btnSign" class="b-sign">MODE: TAMBAH (+)</button>
+    <button id="btnTest" class="b-test">🧪 Test</button>
+    <button id="btnDoctor" class="b-doc">🩺 Doctor</button>
+    <button id="btnKyeshi" class="b-kye">⏱ Kyeshi</button>
     <button id="btnNew" class="b-new">Match Baru</button>
     <button id="btnSet" class="b-set">⚙ Pengaturan</button>
   </div>
@@ -97,10 +106,14 @@
         $(s + 'Wins').textContent = st.roundWinner.filter((x) => x === s).length;
       }
 
-      const names = { waiting: 'SIAP', running: 'BERJALAN', paused: 'KAL-YEO', rest: 'ISTIRAHAT', superiority: 'SERI (SUPERIORITY)', ended: 'SELESAI' };
+      const names = {
+        waiting: 'SIAP', running: 'BERJALAN', paused: 'KAL-YEO', rest: 'ISTIRAHAT',
+        superiority: 'SERI (SUPERIORITY)', ended: 'SELESAI', test: 'TEST MODE',
+        kyeshi: st.injury === 'doctor' ? 'DOCTOR / KYESHI' : 'KYESHI',
+      };
       $('phase').textContent = names[st.phase];
       $('round').textContent = 'Ronde ' + st.round;
-      $('timer').textContent = fmt(st.timeLeft);
+      $('timer').textContent = fmt(st.phase === 'kyeshi' ? st.injuryTime : st.timeLeft);
       // pengaturan
       const S = st.settings;
       setVal('sRound', S.roundTime);
@@ -130,6 +143,7 @@
       if (b.dataset.pts) send('add', { side: b.dataset.side, pts: sign * Number(b.dataset.pts) });
       if (b.dataset.gj) send('gamjeom', { side: b.dataset.gj, delta: sign });
       if (b.dataset.sup) send('superiority', { side: b.dataset.sup });
+      if (b.dataset.injwin) send('injuryWin', { side: b.dataset.injwin });
     });
 
     $('btnStart').onclick = () => send('start');
@@ -168,6 +182,11 @@
         pointGap: Math.max(1, Number($('sGap').value) || 15),
       }));
     }
+    // ----- test, doctor, kyeshi -----
+    $('btnTest').onclick = () => send('test');
+    $('btnDoctor').onclick = () => send('doctor');
+    $('btnKyeshi').onclick = () => send('kyeshi');
+    $('btnResume').onclick = () => send('resume');
   </script>
 </body>
 </html>

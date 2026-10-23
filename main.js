@@ -8,6 +8,7 @@ const settingsFile = path.join(app.getPath('userData'), 'settings.json');
 const settings = {
   roundTime: 120,    // detik per ronde
   restTime: 60,      // detik istirahat antar ronde
+  kyeshiTime: 60,    // detik Kyeshi (waktu perawatan cedera)
   gamjeomLimit: 5,   // 5 gam-jeom dalam 1 ronde = lawan menang ronde
   pointGapOn: true,
   pointGap: 15,      // selisih poin per ronde (aturan WT: 15)
@@ -32,6 +33,8 @@ function newMatch() {
     roundWinner: [null, null, null],
     winner: null,
     settings,
+    injury: null,     // null | 'kyeshi' | 'doctor'
+    injuryTime: 0,
   };
 }
 let state = newMatch();
@@ -102,6 +105,30 @@ function handle(type, p = {}) {
     case 'superiority': // p = { side } pemenang ronde seri
       if (state.phase === 'superiority') endRound(p.side);
       break;
+    case 'test': // masuk/keluar Test Mode (hanya saat siap)
+      if (state.phase === 'waiting') state.phase = 'test';
+      else if (state.phase === 'test') state.phase = 'waiting';
+      break;
+    case 'kyeshi':
+    case 'doctor': // doctor otomatis memulai kyeshi
+      if (state.phase === 'running' || state.phase === 'paused') {
+        state.phase = 'kyeshi';
+        state.injuryTime = settings.kyeshiTime;
+        state.injury = type;
+      } else if (state.phase === 'kyeshi' && type === 'doctor') {
+        state.injury = 'doctor';
+      }
+      break;
+    case 'resume': // selesai kyeshi -> Kal-yeo, operator tekan Start (Kye-sok)
+      if (state.phase === 'kyeshi') { state.phase = 'paused'; state.injury = null; }
+      break;
+    case 'injuryWin': // p = { side } pemenang karena lawan tidak bisa lanjut
+      if (state.phase === 'kyeshi') {
+        state.phase = 'ended';
+        state.winner = p.side;
+        state.injury = null;
+      }
+      break;
     case 'setSettings': // p = { roundTime, restTime, gamjeomLimit, pointGapOn, pointGap }
       Object.assign(settings, p);
       saveSettings();
@@ -137,6 +164,9 @@ setInterval(() => {
       state.phase = 'waiting';
       state.timeLeft = settings.roundTime;
     }
+    broadcast();
+  } else if (state.phase === 'kyeshi') {
+    if (state.injuryTime > 0) state.injuryTime--;
     broadcast();
   }
 }, 1000);

@@ -165,3 +165,15 @@ body.minus .b-sign { background: #c62828 !important; }
 .op-settings label { display: flex; align-items: center; gap: 8px; }
 .op-settings input[type="number"] { width: 90px; }
 .b-set { background: #37474f !important; }
+/* ===== TEST, DOCTOR, KYESHI ===== */
+body[data-phase="kyeshi"] .timer { background: #e53935; color: #fff; }
+body[data-phase="test"] .timer   { background: #607d8b; color: #fff; }
+.ov-test { font-size: 14vh; font-weight: 800; letter-spacing: .5vw; }
+
+.inj { display: none; gap: 10px; align-items: center; margin-top: 12px; padding: 10px; background: #5a1a1a; border-radius: 8px; }
+body[data-phase="kyeshi"] .inj { display: flex; }
+.inj span { flex: 1; }
+
+.b-test { background: #546e7a !important; }
+.b-doc  { background: #c62828 !important; }
+.b-kye  { background: #ad1457 !important; }
