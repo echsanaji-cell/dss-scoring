@@ -21,13 +21,6 @@
   <!-- Dua sisi: dibuat lewat JS di bawah -->
   <div class="op-main" id="sides"></div>
 
-  <!-- Alasan Gam-jeom -->
-  <div class="op-gjbar">
-    <span>Alasan Gam-jeom berikutnya:</span>
-    <select id="gjReason"></select>
-    <span class="gj-hint" id="gjHint"></span>
-  </div>
-
   <!-- Tiebreaker -->
   <div class="tie">
     <div class="tie-head">⚖ SKOR SERI: TIEBREAKER</div>
@@ -119,9 +112,6 @@
     </label>
   </div>
 
-  <!-- Log kejadian -->
-  <div class="op-log" id="log"></div>
-
   <!-- Rekap ronde -->
   <table class="op-table" id="recap"></table>
 
@@ -160,7 +150,10 @@
         <div class="op-pts">
           ${TECHS.map(([k, n, t]) => `<button data-side="${s}" data-tech="${k}">+${n}<small>${t}</small></button>`).join('')}
         </div>
-        <button class="op-gj" data-gj="${s}">GAM-JEOM <b id="${s}Gj">0</b> <small id="${s}GjPts"></small></button>
+        <div class="op-gjrow">
+          <button class="op-gj" data-gj="${s}">GAM-JEOM <b id="${s}Gj">0</b></button>
+          <button class="op-gj op-gjp" data-gjp="${s}">GJ PASIF <small id="${s}GjPts"></small></button>
+        </div>
         <button class="op-ivrbtn" data-ivr="${s}">🎥 IVR Coach (sisa <b id="${s}Ivr">1</b>)</button>
         <div class="op-wins">Ronde menang: <b id="${s}Wins">0</b></div>
       </div>`;
@@ -172,17 +165,9 @@
       if (document.activeElement !== el) el.value = v; // jangan ganggu saat sedang mengetik
     }
 
-    // ----- Gam-jeom: poin untuk lawan (+2 jika pasif di 10 detik terakhir) -----
-    function gjPts() {
-      if (!last) return 1;
-      const r = last.meta.gj.find((x) => x[0] === $('gjReason').value);
-      const late = (last.phase === 'running' || last.phase === 'paused') && last.timeLeft <= 10;
-      return r && r[2] && late ? 2 : 1;
-    }
+    // ----- Gam-jeom pasif: Gam-jeom tetap 1, lawan mendapat 2 poin -----
     function showGjHint() {
-      const p = gjPts();
-      for (const s of ['chung', 'hong']) $(s + 'GjPts').textContent = '(lawan +' + p + ')';
-      $('gjHint').textContent = p === 2 ? 'Pasif di 10 detik terakhir: 2 poin untuk lawan' : '';
+      for (const s of ['chung', 'hong']) $(s + 'GjPts').textContent = '(lawan +2)';
     }
 
     // ----- IVR: pilihan koreksi -----
@@ -231,13 +216,6 @@
       const scoring = st.phase === 'running' || st.phase === 'paused';
       document.body.dataset.phase = st.phase;
 
-      if (!gjFilled) {
-        $('gjReason').innerHTML = st.meta.gj
-          .filter((r) => r[0] !== 'kartu-ditolak')
-          .map(([k, n, p]) => `<option value="${k}">${n}${p ? ' (pasif)' : ''}</option>`).join('');
-        gjFilled = true;
-      }
-
       setVal('category', st.category);
       setVal('matchNo', st.matchNo);
       for (const s of ['chung', 'hong']) {
@@ -276,7 +254,7 @@
         ivrReq = 'wasit';
         lastIvrKind = null;
       } else {
-        $('ivrHead').textContent = `🎥 ${IVR_NAME[st.ivrKind]}${st.ivrBy ? ' – ' + SIDE[st.ivrBy] : ''} · Review Jury: sisa ${st.ivrTime} detik`;
+        $('ivrHead').textContent = `🎥 ${IVR_NAME[st.ivrKind]}${st.ivrBy ? ' – ' + SIDE[st.ivrBy] : ''}`;
         $('ivrReq').style.display = st.ivrKind === 'technical' ? 'flex' : 'none';
         if (st.ivrKind !== lastIvrKind) {
           lastIvrKind = st.ivrKind;
@@ -313,7 +291,6 @@
       if (document.activeElement !== $('sJudge')) $('sJudge').value = String(S.judgeCount);
 
       // log dan rekap
-      $('log').innerHTML = logHTML(st);
       let rows = '<tr><th>Ronde</th><th>Chung</th><th>GJ</th><th>Hong</th><th>GJ</th><th>Pemenang</th></tr>';
       for (let r = 0; r < 3; r++) {
         const w = st.roundWinner[r];
@@ -333,11 +310,8 @@
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.tech) send('score', { side: b.dataset.side, tech: b.dataset.tech });
-      if (b.dataset.gj) {
-        send('gj', { side: b.dataset.gj, reason: $('gjReason').value });
-        $('gjReason').value = 'umum';
-        showGjHint();
-      }
+      if (b.dataset.gj) send('gj', { side: b.dataset.gj, passive: false });
+      if (b.dataset.gjp) send('gj', { side: b.dataset.gjp, passive: true });
       if (b.dataset.ivr) send('ivr', { kind: 'coach', side: b.dataset.ivr });
       if (b.dataset.ivrp) { adj.side = b.dataset.ivrp; showIvrSel(); }
       if (b.dataset.ivrk) { adj.kind = b.dataset.ivrk; showIvrSel(); }
@@ -348,8 +322,6 @@
       if (b.dataset.voter) send('vote', { voter: Number(b.dataset.voter), side: b.dataset.vside });
       if (b.dataset.del) send('del', { id: Number(b.dataset.del) });
     });
-
-    $('gjReason').onchange = showGjHint;
 
     $('btnStart').onclick = () => send('start');
     $('btnPause').onclick = () => send('pause');

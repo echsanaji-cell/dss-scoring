@@ -245,3 +245,7 @@ body[data-phase="tie"] .timer { background: #8e24aa; color: #fff; }
 .vote.chung { background: #1565c0; }
 .vote.hong { background: #d32f2f; }
 .ov-sub { font-size: 4vh; opacity: .8; }
+/* ===== Tombol Gam-jeom dan Gam-jeom pasif ===== */
+.op-gjrow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.op-gjp { background: #ff8f00 !important; }
+.op-gjp small { font-weight: 400; }

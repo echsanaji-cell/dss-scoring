@@ -126,10 +126,10 @@ function addScore(side, tech, note) {
   logEvent({ kind: 'score', side, tech, pts: TECH[tech], note });
 }
 
-// side = atlet yang DIKENAI gam-jeom, poin diberikan ke lawannya
-function addGamjeom(side, reason, note) {
-  const late = state.timeLeft <= 10 && (state.phase === 'running' || state.phase === 'paused');
-  logEvent({ kind: 'gj', side, reason, pts: isPassive(reason) && late ? 2 : 1, note });
+// side = atlet yang DIKENAI gam-jeom
+// passive = true: Gam-jeom tetap tercatat 1, tetapi lawan mendapat 2 poin
+function addGamjeom(side, passive, note) {
+  logEvent({ kind: 'gj', side, passive: !!passive, pts: passive ? 2 : 1, note });
 }
 
 function removeEvent(id) {
@@ -233,7 +233,7 @@ function timeUp() {
 function applyAdjs(adjs) {
   for (const a of adjs) {
     if (a.sign > 0) {
-      if (a.kind === 'gj') addGamjeom(a.side, 'umum', 'Koreksi IVR');
+      if (a.kind === 'gj') addGamjeom(a.side, false, 'Koreksi IVR');
       else if (TECH[a.kind]) addScore(a.side, a.kind, 'Koreksi IVR');
     } else {
       const last = [...state.events].reverse().find((e) =>
@@ -258,8 +258,8 @@ function handle(type, p = {}) {
     case 'score': // p = { side, tech }
       if (scoring && TECH[p.tech]) { addScore(p.side, p.tech); checkRound(); }
       break;
-    case 'gj': // p = { side (yang dikenai), reason }
-      if (scoring) { addGamjeom(p.side, p.reason || 'umum'); checkRound(); }
+    case 'gj': // p = { side (yang dikenai), passive }
+      if (scoring) { addGamjeom(p.side, !!p.passive); checkRound(); }
       break;
 
     case 'undo':
@@ -347,7 +347,7 @@ function handle(type, p = {}) {
         if (kind === 'coach') state.ivr[by] = Math.max(0, state.ivr[by] - 1);
         // kartu teknis ditolak: Gam-jeom untuk atlet coach pemohon (kuota kartu tidak berkurang)
         if (kind === 'technical' && (by === 'chung' || by === 'hong')) {
-          addGamjeom(by, 'kartu-ditolak', 'Kartu teknis ditolak');
+          addGamjeom(by, state.timeLeft <= 10, 'Kartu teknis ditolak');
         }
       }
       logEvent({ kind: 'ivr', ivrKind: kind, by, result: p.result, reason: p.reason || '' });
@@ -401,9 +401,6 @@ setInterval(() => {
     broadcast();
   } else if (state.phase === 'kyeshi') {
     if (state.injuryTime > 0) state.injuryTime--;
-    broadcast();
-  } else if (state.phase === 'ivr') {
-    if (state.ivrTime > 0) state.ivrTime--;
     broadcast();
   } else if (state.phase === 'tie' && state.tie.stage === 'steps') {
     const t = state.tie;
