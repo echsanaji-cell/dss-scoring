@@ -156,7 +156,7 @@ function endRound(winner) {
     state.phase = 'ended';
     state.winner = winner;
   } else {
-    state.phase = 'rest';
+    state.phase = 'roundEnd'; // tampilkan pemenang ronde; istirahat dimulai oleh operator
     state.timeLeft = settings.restTime;
   }
 }
@@ -177,7 +177,7 @@ function checkRound() {
 // Jika log dihapus saat ronde sudah selesai, ronde dibuka kembali
 function reopenIfNeeded() {
   const p = state.phase;
-  if (p === 'rest' || p === 'tie' || p === 'ended') {
+  if (p === 'roundEnd' || p === 'rest' || p === 'tie' || p === 'ended') {
     state.tie = null;
     state.roundWinner[cur()] = null;
     state.winner = null;
@@ -221,8 +221,8 @@ function startTie() {
     steps,
     decided,
     winner: decided >= 0 ? (steps[decided].chung > steps[decided].hong ? 'chung' : 'hong') : null,
-    stage: 'summary',   // 'summary' (tabel 2 detik) -> 'confirm' (operator konfirmasi) atau 'vote' (Woo-se-girok)
-    hold: 2,
+    stage: 'summary',   // 'summary' (tabel tampil sebentar) -> 'confirm' (operator konfirmasi) atau 'vote' (Woo-se-girok)
+    at: Date.now(),     // saat tabel mulai tampil
     votes: [null, null, null],
   };
 }
@@ -276,7 +276,7 @@ function handle(type, p = {}) {
 
     case 'undo':
     case 'del': { // hapus kejadian terakhir / kejadian tertentu (p = { id })
-      const okPhase = ['running', 'paused', 'rest', 'tie'].includes(state.phase) ||
+      const okPhase = ['running', 'paused', 'roundEnd', 'rest', 'tie'].includes(state.phase) ||
         (state.phase === 'ended' && state.endedBy === 'round');
       if (!okPhase) break;
       let id = p.id;
@@ -296,6 +296,10 @@ function handle(type, p = {}) {
         state.timeLeft = Math.max(0, Math.min(5999, Math.floor(Number(p.seconds) || 0)));
         state.tenths = 0;
       }
+      break;
+
+    case 'startRest': // operator memulai waktu istirahat setelah pemenang ronde tampil
+      if (state.phase === 'roundEnd') state.phase = 'rest';
       break;
 
     case 'confirmTie': // operator mengonfirmasi hasil tiebreaker
@@ -412,10 +416,6 @@ setInterval(() => {
   } else if (state.phase === 'kyeshi') {
     if (state.injuryTime > 0) state.injuryTime--;
     broadcast();
-  } else if (state.phase === 'tie' && state.tie.stage === 'summary') {
-    state.tie.hold--;
-    if (state.tie.hold <= 0) state.tie.stage = state.tie.winner ? 'confirm' : 'vote';
-    broadcast();
   }
 
   // hasil IVR tampil 3 detik di scoreboard
@@ -436,6 +436,11 @@ function tickRunning() {
 }
 
 setInterval(() => {
+  // tabel tiebreaker tampil 3 detik, lalu operator mengonfirmasi (atau Woo-se-girok jika semua sama)
+  if (state.phase === 'tie' && state.tie.stage === 'summary' && Date.now() - state.tie.at >= 3000) {
+    state.tie.stage = state.tie.winner ? 'confirm' : 'vote';
+    broadcast();
+  }
   if (state.phase !== 'running') { lastRun = 0; return; }
   const now = Date.now();
   if (!lastRun) lastRun = now;

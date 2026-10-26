@@ -30,6 +30,12 @@
     <div id="votes"></div>
   </div>
 
+  <!-- Ronde selesai: tunggu operator memulai istirahat -->
+  <div class="rend">
+    <span id="rendInfo"></span>
+    <button class="b-start" data-startrest="1">☕ MULAI ISTIRAHAT</button>
+  </div>
+
   <!-- Panel Kyeshi / cedera -->
   <div class="inj">
     <span>Kyeshi berjalan. Atlet bisa lanjut, atau tetapkan pemenang jika tidak bisa lanjut:</span>
@@ -238,7 +244,7 @@
       showGjHint();
 
       const names = {
-        waiting: 'SIAP', running: 'BERJALAN', paused: 'KAL-YEO', rest: 'ISTIRAHAT',
+        waiting: 'SIAP', running: 'BERJALAN', paused: 'KAL-YEO', roundEnd: 'RONDE SELESAI', rest: 'ISTIRAHAT',
         tie: 'TIEBREAKER', ended: 'SELESAI', test: 'TEST MODE', kyeshi: 'KYESHI', ivr: 'IVR / KARTU TEKNIS',
       };
       $('phase').textContent = names[st.phase];
@@ -268,6 +274,13 @@
         }
       }
       showIvrSel();
+
+      // ronde selesai: pemenang tampil, tunggu operator memulai istirahat
+      if (st.phase === 'roundEnd') {
+        const w = st.roundWinner[i];
+        $('rendInfo').textContent =
+          `Ronde ${st.round} dimenangkan ${w === 'chung' ? 'CHUNG' : 'HONG'} (${st.points.chung[i]} – ${st.points.hong[i]}). Klik tombol untuk memulai waktu istirahat.`;
+      }
 
       // panel tiebreaker
       if (st.phase === 'tie') {
@@ -346,6 +359,7 @@
       if (b.dataset.injwin) send('injuryWin', { side: b.dataset.injwin });
       if (b.dataset.voter) send('vote', { voter: Number(b.dataset.voter), side: b.dataset.vside });
       if (b.dataset.confirmtie) send('confirmTie');
+      if (b.dataset.startrest) send('startRest');
       if (b.dataset.del) send('del', { id: Number(b.dataset.del) });
     });
 

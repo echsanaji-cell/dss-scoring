@@ -270,3 +270,10 @@ body[data-phase="tie"] .timer { background: #8e24aa; color: #fff; }
 .tie-table td.w-chung { background: #1565c0; font-weight: 800; }
 .tie-table td.w-hong { background: #d32f2f; font-weight: 800; }
 #tieInfo { margin-bottom: 10px; }
+
+/* ===== Ronde selesai ===== */
+.rend { display: none; gap: 12px; align-items: center; margin-top: 12px; padding: 12px; background: #1b3a1b; border-radius: 8px; }
+body[data-phase="roundEnd"] .rend { display: flex; }
+.rend span { flex: 1; }
+.rw-score { font-size: 12vh; font-weight: 800; }
+body[data-phase="roundEnd"] .timer { background: #2e7d32; color: #fff; }

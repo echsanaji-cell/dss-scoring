@@ -111,6 +111,7 @@
         waiting: 'MATCH ' + st.matchNo,
         running: 'MATCH ' + st.matchNo,
         paused: 'KAL-YEO',
+        roundEnd: 'ROUND END',
         rest: 'BREAK TIME',
         tie: 'TIEBREAKER',
         kyeshi: 'KYESHI',
@@ -129,6 +130,14 @@
           `<div class="ov-title">MATCH ${st.matchNo} RESULT</div>` +
           `<div class="ov-win">WINNER</div>` +
           `<div class="ov-name">${w.name} (${w.country})</div>`;
+      } else if (st.phase === 'roundEnd') {
+        const w = st.roundWinner[i];
+        const p = st[w];
+        ov.className = 'overlay ' + w;
+        ov.innerHTML =
+          `<div class="ov-title">ROUND ${st.round} WINNER</div>` +
+          `<div class="ov-name">${p.name} (${p.country})</div>` +
+          `<div class="rw-score">${st.points.chung[i]} – ${st.points.hong[i]}</div>`;
       } else if (st.phase === 'test') {
         ov.className = 'overlay';
         ov.innerHTML = `<div class="ov-test">TEST MODE</div>`;
