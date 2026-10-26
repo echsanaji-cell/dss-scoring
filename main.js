@@ -9,6 +9,7 @@ const settings = {
   roundTime: 120,    // detik per ronde
   restTime: 60,      // detik istirahat antar ronde
   kyeshiTime: 60,    // detik Kyeshi (waktu perawatan cedera)
+  ivrQuota: 1,       // jatah IVR per pelatih per pertandingan
   gamjeomLimit: 5,   // 5 gam-jeom dalam 1 ronde = lawan menang ronde
   pointGapOn: true,
   pointGap: 15,      // selisih poin per ronde (aturan WT: 15)
@@ -33,7 +34,12 @@ function newMatch() {
     roundWinner: [null, null, null],
     winner: null,
     settings,
-    injury: null,     // null | 'kyeshi' | 'doctor'
+    injuryTime: 0,
+    ivr: { chung: settings.ivrQuota, hong: settings.ivrQuota },
+    ivrBy: null,        // siapa yang meminta IVR
+    ivrTime: 0,         // hitung mundur 30 detik Review Jury
+    ivrResult: null,    // { by, result } tampil 3 detik di scoreboard
+    ivrResultTime: 0,
   };
 }
 let state = newMatch();
@@ -123,12 +129,45 @@ function handle(type, p = {}) {
         state.winner = p.side;
       }
       break;
-    case 'setSettings': // p = { roundTime, restTime, gamjeomLimit, pointGapOn, pointGap }
+        case 'setSettings': // p = { roundTime, restTime, gamjeomLimit, pointGapOn, pointGap, ivrQuota }
       Object.assign(settings, p);
       saveSettings();
-      if (state.phase === 'waiting') state.timeLeft = settings.roundTime;
+      if (state.phase === 'waiting') {
+        state.timeLeft = settings.roundTime;
+        if (state.round === 1) state.ivr = { chung: settings.ivrQuota, hong: settings.ivrQuota };
+      }
       checkRound();
       break;
+    case 'ivr': // p = { side } pelatih yang meminta
+      if ((state.phase === 'running' || state.phase === 'paused') && state.ivr[p.side] > 0) {
+        state.phase = 'ivr';
+        state.ivrBy = p.side;
+        state.ivrTime = 30;
+      }
+      break;
+    case 'ivrCancel': // batal, kuota tidak berkurang
+      if (state.phase === 'ivr') { state.phase = 'paused'; state.ivrBy = null; }
+      break;
+    case 'ivrDecide': { // p = { result: 'accept'|'reject', adj: null | { side, kind: 'pts'|'gj', value, sign } }
+      if (state.phase !== 'ivr') break;
+      const by = state.ivrBy;
+      state.phase = 'paused';
+      if (p.result === 'accept' && p.adj) {
+        const a = p.adj;
+        if (a.kind === 'pts') {
+          state.points[a.side][i] = Math.max(0, state.points[a.side][i] + a.sign * a.value);
+        } else {
+          state.gamjeom[a.side][i] = Math.max(0, state.gamjeom[a.side][i] + a.sign);
+          state.points[other(a.side)][i] = Math.max(0, state.points[other(a.side)][i] + a.sign);
+        }
+      }
+      if (p.result === 'reject') state.ivr[by] = Math.max(0, state.ivr[by] - 1);
+      state.ivrResult = { by, result: p.result };
+      state.ivrResultTime = 3;
+      state.ivrBy = null;
+      checkRound();
+      break;
+    }
     case 'setInfo': // ubah nama peserta, kategori, nomor match
       state.category = p.category;
       state.matchNo = p.matchNo;
@@ -161,6 +200,16 @@ setInterval(() => {
     broadcast();
   } else if (state.phase === 'kyeshi') {
     if (state.injuryTime > 0) state.injuryTime--;
+    broadcast();
+  } else if (state.phase === 'ivr') {
+    if (state.ivrTime > 0) state.ivrTime--;
+    broadcast();
+  }
+
+  // hasil IVR tampil 3 detik di scoreboard
+  if (state.ivrResultTime > 0) {
+    state.ivrResultTime--;
+    if (state.ivrResultTime === 0) state.ivrResult = null;
     broadcast();
   }
 }, 1000);

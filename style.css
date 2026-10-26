@@ -176,3 +176,24 @@ body[data-phase="kyeshi"] .inj { display: flex; }
 
 .b-test { background: #546e7a !important; }
 .b-kye  { background: #ad1457 !important; }
+/* ===== IVR ===== */
+.cam { font-size: 4vh; }
+.ov-ivr  { font-size: 8vh; font-weight: 800; }
+.ov-cam  { font-size: 16vh; }
+.ov-mark { font-size: 20vh; font-weight: 800; line-height: 1; }
+.ov-mark.ok { color: #00e676; }
+.ov-mark.no { color: #ff5252; }
+.c-blue { color: #4d8dff; }
+.c-red  { color: #ff5252; }
+
+.op-ivrbtn { background: #263238 !important; font-weight: 700; }
+.op-ivrbtn:disabled { opacity: .4; cursor: not-allowed; }
+
+.ivr { display: none; margin-top: 12px; padding: 12px; background: #1a2a3a; border-radius: 8px; }
+body[data-phase="ivr"] .ivr { display: block; }
+.ivr-head { font-size: 17px; margin-bottom: 10px; }
+.ivr-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.ivr-row > span { width: 110px; opacity: .8; }
+.ivr button.sel { outline: 3px solid #ffeb00; }
+.ivr-sel { margin-bottom: 10px; color: #ffeb00; }
+.b-reject { background: #c62828 !important; font-weight: 700; }

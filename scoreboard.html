@@ -17,6 +17,7 @@
       <div class="score" id="chungScore">0</div>
       <div class="foot">
         <div class="gj">GAM-JEOM <b id="chungGj">0</b></div>
+        <div class="cam" id="chungCam">🎥</div>
         <div class="dots" id="chungDots"></div>
       </div>
     </div>
@@ -35,6 +36,7 @@
       <div class="score" id="hongScore">0</div>
       <div class="foot">
         <div class="gj">GAM-JEOM <b id="hongGj">0</b></div>
+        <div class="cam" id="hongCam">🎥</div>
         <div class="dots" id="hongDots"></div>
       </div>
     </div>
@@ -63,6 +65,7 @@
         $(s + 'Dots').innerHTML = [0, 1]
           .map((n) => `<span class="dot ${n < w ? 'on' : ''}"></span>`)
           .join('');
+        $(s + 'Cam').style.opacity = st.ivr && st.ivr[s] > 0 ? 1 : 0.2;
       }
 
       $('timer').textContent = fmt(st.phase === 'kyeshi' ? st.injuryTime : st.timeLeft);
@@ -75,12 +78,17 @@
         rest: 'BREAK TIME',
         superiority: 'SUPERIORITY',
         kyeshi: 'KYESHI',
+        ivr: 'VIDEO REPLAY',
         test: 'TEST MODE',
         ended: 'MATCH ' + st.matchNo,
       };
       $('label').textContent = labels[st.phase];
 
       const ov = $('overlay');
+      const sideTxt = (s) => (s === 'chung'
+        ? '<span class="c-blue">BLUE</span>'
+        : '<span class="c-red">RED</span>');
+
       if (st.phase === 'ended') {
         const w = st[st.winner];
         ov.className = 'overlay ' + st.winner;
@@ -91,6 +99,18 @@
       } else if (st.phase === 'test') {
         ov.className = 'overlay';
         ov.innerHTML = `<div class="ov-test">TEST MODE</div>`;
+      } else if (st.phase === 'ivr') {
+        ov.className = 'overlay';
+        ov.innerHTML =
+          `<div class="ov-ivr">VIDEO REPLAY ${sideTxt(st.ivrBy)}</div>` +
+          `<div class="ov-cam">🎥</div>`;
+      } else if (st.ivrResult) {
+        const ok = st.ivrResult.result === 'accept';
+        ov.className = 'overlay';
+        ov.innerHTML =
+          `<div class="ov-ivr">VIDEO REPLAY ${sideTxt(st.ivrResult.by)}</div>` +
+          `<div class="ov-mark ${ok ? 'ok' : 'no'}">${ok ? '○' : '✕'}</div>` +
+          `<div class="ov-ivr">${ok ? 'ACCEPTED' : 'REJECTED'}</div>`;
       } else {
         ov.className = 'overlay hidden';
       }
@@ -99,7 +119,7 @@
     ipcRenderer.invoke('getState').then(render);
     ipcRenderer.on('state', (e, st) => render(st));
 
-    // ===== TOMBOL TES SEMENTARA (nanti diganti layar operator) =====
+    // ===== TOMBOL TES (di jendela scoreboard) =====
     const send = (type, payload) => ipcRenderer.send('cmd', type, payload);
     const keys = {
       q: () => send('add', { side: 'chung', pts: 1 }),
