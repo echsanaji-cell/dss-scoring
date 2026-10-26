@@ -259,7 +259,11 @@ function handle(type, p = {}) {
       if (scoring && TECH[p.tech]) { addScore(p.side, p.tech); checkRound(); }
       break;
     case 'gj': // p = { side (yang dikenai), passive }
-      if (scoring) { addGamjeom(p.side, !!p.passive); checkRound(); }
+      // Gam-jeom pasif hanya sah di 10 detik terakhir ronde
+      if (scoring && (!p.passive || state.timeLeft <= 10)) {
+        addGamjeom(p.side, !!p.passive);
+        checkRound();
+      }
       break;
 
     case 'undo':

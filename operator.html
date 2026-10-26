@@ -165,9 +165,13 @@
       if (document.activeElement !== el) el.value = v; // jangan ganggu saat sedang mengetik
     }
 
-    // ----- Gam-jeom pasif: Gam-jeom tetap 1, lawan mendapat 2 poin -----
+    // ----- Gam-jeom pasif: aktif hanya di 10 detik terakhir ronde (Gam-jeom tetap 1, lawan +2) -----
     function showGjHint() {
-      for (const s of ['chung', 'hong']) $(s + 'GjPts').textContent = '(lawan +2)';
+      const on = !!last && (last.phase === 'running' || last.phase === 'paused') && last.timeLeft <= 10;
+      for (const s of ['chung', 'hong']) {
+        $(s + 'GjPts').textContent = on ? '(lawan +2)' : '(aktif ≤10 detik)';
+      }
+      document.querySelectorAll('[data-gjp]').forEach((b) => { b.disabled = !on; });
     }
 
     // ----- IVR: pilihan koreksi -----

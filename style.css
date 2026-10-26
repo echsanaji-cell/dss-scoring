@@ -249,3 +249,6 @@ body[data-phase="tie"] .timer { background: #8e24aa; color: #fff; }
 .op-gjrow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .op-gjp { background: #ff8f00 !important; }
 .op-gjp small { font-weight: 400; }
+/* ===== Tombol nonaktif ===== */
+.operator button:disabled { opacity: .35; cursor: not-allowed; }
+.operator button:disabled:hover { filter: none; }
