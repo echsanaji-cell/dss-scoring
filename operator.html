@@ -40,8 +40,7 @@
     <button class="b-pause" id="btnPause">⏸ Kal-yeo (Spasi)</button>
     <button id="btnSign" class="b-sign">MODE: TAMBAH (+)</button>
     <button id="btnTest" class="b-test">🧪 Test</button>
-    <button id="btnDoctor" class="b-doc">🩺 Doctor</button>
-    <button id="btnKyeshi" class="b-kye">⏱ Kyeshi</button>
+    <button id="btnKyeshi" class="b-kye">⏱ Kyeshi (Dokter)</button>
     <button id="btnNew" class="b-new">Match Baru</button>
     <button id="btnSet" class="b-set">⚙ Pengaturan</button>
   </div>
@@ -109,7 +108,7 @@
       const names = {
         waiting: 'SIAP', running: 'BERJALAN', paused: 'KAL-YEO', rest: 'ISTIRAHAT',
         superiority: 'SERI (SUPERIORITY)', ended: 'SELESAI', test: 'TEST MODE',
-        kyeshi: st.injury === 'doctor' ? 'DOCTOR / KYESHI' : 'KYESHI',
+        kyeshi: 'KYESHI',
       };
       $('phase').textContent = names[st.phase];
       $('round').textContent = 'Ronde ' + st.round;
@@ -184,7 +183,6 @@
     }
     // ----- test, doctor, kyeshi -----
     $('btnTest').onclick = () => send('test');
-    $('btnDoctor').onclick = () => send('doctor');
     $('btnKyeshi').onclick = () => send('kyeshi');
     $('btnResume').onclick = () => send('resume');
   </script>

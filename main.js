@@ -34,7 +34,6 @@ function newMatch() {
     winner: null,
     settings,
     injury: null,     // null | 'kyeshi' | 'doctor'
-    injuryTime: 0,
   };
 }
 let state = newMatch();
@@ -109,24 +108,19 @@ function handle(type, p = {}) {
       if (state.phase === 'waiting') state.phase = 'test';
       else if (state.phase === 'test') state.phase = 'waiting';
       break;
-    case 'kyeshi':
-    case 'doctor': // doctor otomatis memulai kyeshi
+    case 'kyeshi': // timer cedera / dokter
       if (state.phase === 'running' || state.phase === 'paused') {
         state.phase = 'kyeshi';
         state.injuryTime = settings.kyeshiTime;
-        state.injury = type;
-      } else if (state.phase === 'kyeshi' && type === 'doctor') {
-        state.injury = 'doctor';
       }
       break;
     case 'resume': // selesai kyeshi -> Kal-yeo, operator tekan Start (Kye-sok)
-      if (state.phase === 'kyeshi') { state.phase = 'paused'; state.injury = null; }
+      if (state.phase === 'kyeshi') state.phase = 'paused';
       break;
     case 'injuryWin': // p = { side } pemenang karena lawan tidak bisa lanjut
       if (state.phase === 'kyeshi') {
         state.phase = 'ended';
         state.winner = p.side;
-        state.injury = null;
       }
       break;
     case 'setSettings': // p = { roundTime, restTime, gamjeomLimit, pointGapOn, pointGap }
