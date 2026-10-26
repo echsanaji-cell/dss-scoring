@@ -79,6 +79,8 @@ function newMatch() {
     round: 1,
     phase: 'waiting', // waiting | running | paused | rest | tie | kyeshi | ivr | test | ended
     timeLeft: settings.roundTime,
+    tenths: 0,        // sepersepuluh detik (0-9), untuk tampilan 10 detik terakhir
+    savedTenths: 0,
     events: [],       // log kejadian (sumber semua poin)
     points: { chung: [0, 0, 0], hong: [0, 0, 0] },   // dihitung dari events
     gamjeom: { chung: [0, 0, 0], hong: [0, 0, 0] },  // dihitung dari events
@@ -104,6 +106,8 @@ let state = newMatch();
 const other = (s) => (s === 'chung' ? 'hong' : 'chung');
 const cur = () => state.round - 1;
 const wins = (s) => state.roundWinner.filter((w) => w === s).length;
+// aktif hanya saat waktu sudah di bawah 10,00 detik (mulai 9,99)
+const inLast10 = () => state.timeLeft < 10;
 
 function recompute() {
   const pts = { chung: [0, 0, 0], hong: [0, 0, 0] };
@@ -143,6 +147,8 @@ function removeEvent(id) {
 // ===== ATURAN RONDE =====
 function endRound(winner) {
   state.savedTime = state.timeLeft;
+  state.savedTenths = state.tenths;
+  state.tenths = 0;
   state.tie = null;
   state.roundWinner[cur()] = winner;
   state.endedBy = 'round';
@@ -178,6 +184,7 @@ function reopenIfNeeded() {
     state.endedBy = null;
     state.phase = 'paused';
     state.timeLeft = state.savedTime;
+    state.tenths = state.savedTenths || 0;
   }
 }
 
@@ -204,17 +211,18 @@ function tieSteps() {
 
 function startTie() {
   const steps = tieSteps();
-  const decidedIdx = steps.findIndex((s) => s.chung !== s.hong);
-  state.phase = 'tie';
+  const decided = steps.findIndex((s) => s.chung !== s.hong); // -1 = semua kriteria sama
   state.timeLeft = 0;
+  state.tenths = 0;
+  state.phase = 'tie';
   state.savedTime = 0;
+  state.savedTenths = 0;
   state.tie = {
     steps,
-    decidedIdx,       // -1 = semua kriteria sama -> Woo-se-girok
-    shown: 0,         // kriteria yang sedang tampil di scoreboard
-    hold: 3,          // detik tiap kriteria ditampilkan
-    stage: 'steps',   // 'steps' | 'vote'
-    winner: decidedIdx >= 0 ? (steps[decidedIdx].chung > steps[decidedIdx].hong ? 'chung' : 'hong') : null,
+    decided,
+    winner: decided >= 0 ? (steps[decided].chung > steps[decided].hong ? 'chung' : 'hong') : null,
+    stage: 'summary',   // 'summary' (tabel 2 detik) -> 'confirm' (operator konfirmasi) atau 'vote' (Woo-se-girok)
+    hold: 2,
     votes: [null, null, null],
   };
 }
@@ -260,7 +268,7 @@ function handle(type, p = {}) {
       break;
     case 'gj': // p = { side (yang dikenai), passive }
       // Gam-jeom pasif hanya sah di 10 detik terakhir ronde
-      if (scoring && (!p.passive || state.timeLeft <= 10)) {
+      if (scoring && (!p.passive || inLast10())) {
         addGamjeom(p.side, !!p.passive);
         checkRound();
       }
@@ -286,7 +294,12 @@ function handle(type, p = {}) {
     case 'setTime': // p = { seconds } koreksi waktu
       if (['waiting', 'paused', 'ivr'].includes(state.phase)) {
         state.timeLeft = Math.max(0, Math.min(5999, Math.floor(Number(p.seconds) || 0)));
+        state.tenths = 0;
       }
+      break;
+
+    case 'confirmTie': // operator mengonfirmasi hasil tiebreaker
+      if (state.phase === 'tie' && state.tie.stage === 'confirm') endRound(state.tie.winner);
       break;
 
     case 'vote': // Woo-se-girok. p = { voter: 0|1|2, side: 'chung'|'hong'|null }
@@ -351,7 +364,7 @@ function handle(type, p = {}) {
         if (kind === 'coach') state.ivr[by] = Math.max(0, state.ivr[by] - 1);
         // kartu teknis ditolak: Gam-jeom untuk atlet coach pemohon (kuota kartu tidak berkurang)
         if (kind === 'technical' && (by === 'chung' || by === 'hong')) {
-          addGamjeom(by, state.timeLeft <= 10, 'Kartu teknis ditolak');
+          addGamjeom(by, inLast10(), 'Kartu teknis ditolak');
         }
       }
       logEvent({ kind: 'ivr', ivrKind: kind, by, result: p.result, reason: p.reason || '' });
@@ -388,14 +401,7 @@ function handle(type, p = {}) {
 
 // ===== TIMER (jalan tiap 1 detik) =====
 setInterval(() => {
-  if (state.phase === 'running') {
-    state.timeLeft--;
-    if (state.timeLeft <= 0) {
-      state.timeLeft = 0;
-      timeUp();
-    }
-    broadcast();
-  } else if (state.phase === 'rest') {
+  if (state.phase === 'rest') {
     state.timeLeft--;
     if (state.timeLeft <= 0) {
       state.round++;
@@ -406,14 +412,9 @@ setInterval(() => {
   } else if (state.phase === 'kyeshi') {
     if (state.injuryTime > 0) state.injuryTime--;
     broadcast();
-  } else if (state.phase === 'tie' && state.tie.stage === 'steps') {
-    const t = state.tie;
-    t.hold--;
-    if (t.hold <= 0) {
-      if (t.decidedIdx >= 0 && t.shown >= t.decidedIdx) endRound(t.winner);
-      else if (t.shown < t.steps.length - 1) { t.shown++; t.hold = 3; }
-      else t.stage = 'vote'; // semua kriteria sama -> Woo-se-girok
-    }
+  } else if (state.phase === 'tie' && state.tie.stage === 'summary') {
+    state.tie.hold--;
+    if (state.tie.hold <= 0) state.tie.stage = state.tie.winner ? 'confirm' : 'vote';
     broadcast();
   }
 
@@ -424,6 +425,28 @@ setInterval(() => {
     broadcast();
   }
 }, 1000);
+
+// ===== TIMER RONDE (presisi 0,1 detik, berbasis jam sistem) =====
+let lastRun = 0;
+
+function tickRunning() {
+  if (state.tenths > 0) state.tenths--;
+  else if (state.timeLeft > 0) { state.timeLeft--; state.tenths = 9; }
+  if (state.timeLeft === 0 && state.tenths === 0) timeUp();
+}
+
+setInterval(() => {
+  if (state.phase !== 'running') { lastRun = 0; return; }
+  const now = Date.now();
+  if (!lastRun) lastRun = now;
+  let steps = Math.floor((now - lastRun) / 100);
+  if (steps < 1) return;
+  lastRun += steps * 100;
+  const before = state.timeLeft;
+  while (steps-- > 0 && state.phase === 'running') tickRunning();
+  // di luar 10 detik terakhir cukup kirim tiap detik; di 10 detik terakhir tiap 0,1 detik
+  if (state.phase !== 'running' || state.timeLeft !== before || state.timeLeft <= 10) broadcast();
+}, 50);
 
 // ===== JENDELA =====
 const windows = [];

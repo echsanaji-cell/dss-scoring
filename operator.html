@@ -23,8 +23,10 @@
 
   <!-- Tiebreaker -->
   <div class="tie">
-    <div class="tie-head">⚖ SKOR SERI: TIEBREAKER</div>
+    <div class="tie-head">⚖ TIEBREAKER</div>
+    <div id="tieTable"></div>
     <div id="tieInfo"></div>
+    <div id="tieConfirm"></div>
     <div id="votes"></div>
   </div>
 
@@ -167,7 +169,7 @@
 
     // ----- Gam-jeom pasif: aktif hanya di 10 detik terakhir ronde (Gam-jeom tetap 1, lawan +2) -----
     function showGjHint() {
-      const on = !!last && (last.phase === 'running' || last.phase === 'paused') && last.timeLeft <= 10;
+      const on = !!last && (last.phase === 'running' || last.phase === 'paused') && last.timeLeft < 10;
       for (const s of ['chung', 'hong']) {
         $(s + 'GjPts').textContent = on ? '(lawan +2)' : '(aktif ≤10 detik)';
       }
@@ -270,17 +272,36 @@
       // panel tiebreaker
       if (st.phase === 'tie') {
         const t = st.tie;
-        if (t.stage === 'steps') {
-          const s = t.steps[t.shown];
-          $('tieInfo').textContent = `Menampilkan kriteria ${t.shown + 1}/${t.steps.length}: ${s.title} (Chung ${s.chung} – Hong ${s.hong})`;
-          $('votes').innerHTML = '';
-        } else {
+        const rows = t.steps.map((s, n) => {
+          const cw = t.decided === n && s.chung > s.hong;
+          const hw = t.decided === n && s.hong > s.chung;
+          const dim = t.decided >= 0 && n > t.decided;
+          return `<tr class="${dim ? 'after' : ''}"><td>${s.title}</td>` +
+            `<td class="${cw ? 'w-chung' : ''}">${s.chung}</td>` +
+            `<td class="${hw ? 'w-hong' : ''}">${s.hong}</td></tr>`;
+        }).join('');
+        $('tieTable').innerHTML =
+          `<table class="tie-table"><tr><th>Kriteria</th><th>CHUNG</th><th>HONG</th></tr>${rows}</table>`;
+
+        if (t.stage === 'vote') {
           $('tieInfo').textContent = 'Semua kriteria sama. WOO-SE-GIROK: masukkan pilihan tiap pemberi suara (pemenang = 2 dari 3 suara).';
+          $('tieConfirm').innerHTML = '';
           $('votes').innerHTML = voterNames(st.settings.judgeCount).map((n, v) => `
             <div class="ivr-row"><span>${n}</span>
               <button class="b-chung ${t.votes[v] === 'chung' ? 'sel' : ''}" data-voter="${v}" data-vside="chung">CHUNG</button>
               <button class="b-hong ${t.votes[v] === 'hong' ? 'sel' : ''}" data-voter="${v}" data-vside="hong">HONG</button>
             </div>`).join('');
+        } else {
+          $('votes').innerHTML = '';
+          if (t.stage === 'confirm') {
+            const nm = t.winner === 'chung' ? 'CHUNG' : 'HONG';
+            $('tieInfo').textContent = `Hasil tiebreaker: ${nm} menang ronde ${st.round}.`;
+            $('tieConfirm').innerHTML =
+              `<button class="b-start" data-confirmtie="1">✔ KONFIRMASI: ${nm} MENANG RONDE ${st.round}</button>`;
+          } else {
+            $('tieInfo').textContent = 'Menghitung kriteria tiebreak...';
+            $('tieConfirm').innerHTML = '';
+          }
         }
       }
 
@@ -324,6 +345,7 @@
       if (b.dataset.adjdel) { adjs.splice(Number(b.dataset.adjdel), 1); showIvrSel(); }
       if (b.dataset.injwin) send('injuryWin', { side: b.dataset.injwin });
       if (b.dataset.voter) send('vote', { voter: Number(b.dataset.voter), side: b.dataset.vside });
+      if (b.dataset.confirmtie) send('confirmTie');
       if (b.dataset.del) send('del', { id: Number(b.dataset.del) });
     });
 

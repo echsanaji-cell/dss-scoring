@@ -252,3 +252,21 @@ body[data-phase="tie"] .timer { background: #8e24aa; color: #fff; }
 /* ===== Tombol nonaktif ===== */
 .operator button:disabled { opacity: .35; cursor: not-allowed; }
 .operator button:disabled:hover { filter: none; }
+
+/* ===== Tabel tiebreaker ===== */
+.tb-table { border-collapse: separate; border-spacing: 0 1vh; width: 80vw; }
+.tb-table td { padding: 1.2vh 2vw; font-size: 4.2vh; font-weight: 700; }
+.tb-table td.crit { background: #222; text-align: left; }
+.tb-table td.n { text-align: center; font-size: 6vh; width: 14vw; }
+.tb-table td.n.chung { background: #1565c0; }
+.tb-table td.n.hong { background: #d32f2f; }
+.tb-table td.n.win { outline: .8vh solid #ffeb00; }
+.tb-table tr.dim { opacity: .35; }
+
+.tie-table { border-collapse: collapse; margin-bottom: 10px; }
+.tie-table th, .tie-table td { border: 1px solid #555; padding: 6px 14px; text-align: center; }
+.tie-table td:first-child { text-align: left; }
+.tie-table tr.after { opacity: .4; }
+.tie-table td.w-chung { background: #1565c0; font-weight: 800; }
+.tie-table td.w-hong { background: #d32f2f; font-weight: 800; }
+#tieInfo { margin-bottom: 10px; }
