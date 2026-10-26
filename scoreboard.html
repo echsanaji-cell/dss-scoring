@@ -50,6 +50,16 @@
     const fmt = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     let last = null;
 
+    const sideTxt = (s) => (s === 'chung'
+      ? '<span class="c-blue">BLUE</span>'
+      : '<span class="c-red">RED</span>');
+
+    function ivrTitle(kind, by) {
+      if (kind === 'coach') return `VIDEO REPLAY ${sideTxt(by)}`;
+      if (kind === 'technical') return 'TECHNICAL CARD';
+      return 'VIDEO REPLAY';
+    }
+
     function render(st) {
       last = st;
       const i = st.round - 1;
@@ -76,18 +86,15 @@
         running: 'MATCH ' + st.matchNo,
         paused: 'KAL-YEO',
         rest: 'BREAK TIME',
-        superiority: 'SUPERIORITY',
+        tie: 'TIEBREAKER',
         kyeshi: 'KYESHI',
-        ivr: 'VIDEO REPLAY',
+        ivr: st.ivrKind === 'technical' ? 'TECHNICAL CARD' : 'VIDEO REPLAY',
         test: 'TEST MODE',
         ended: 'MATCH ' + st.matchNo,
       };
       $('label').textContent = labels[st.phase];
 
       const ov = $('overlay');
-      const sideTxt = (s) => (s === 'chung'
-        ? '<span class="c-blue">BLUE</span>'
-        : '<span class="c-red">RED</span>');
 
       if (st.phase === 'ended') {
         const w = st[st.winner];
@@ -99,16 +106,41 @@
       } else if (st.phase === 'test') {
         ov.className = 'overlay';
         ov.innerHTML = `<div class="ov-test">TEST MODE</div>`;
+      } else if (st.phase === 'tie') {
+        const t = st.tie;
+        ov.className = 'overlay';
+        if (t.stage === 'steps') {
+          const s = t.steps[t.shown];
+          const decided = t.decidedIdx === t.shown;
+          const cw = decided && s.chung > s.hong;
+          const hw = decided && s.hong > s.chung;
+          ov.innerHTML =
+            `<div class="tb-title">TIEBREAKER</div>` +
+            `<div class="tb-crit">${s.title}</div>` +
+            `<div class="tb-row">` +
+              `<div class="tb-num chung ${cw ? 'win' : ''}">${s.chung}</div>` +
+              `<div class="tb-num hong ${hw ? 'win' : ''}">${s.hong}</div>` +
+            `</div>` +
+            `<div class="tb-step">Kriteria ${t.shown + 1} / ${t.steps.length}</div>`;
+        } else {
+          ov.innerHTML =
+            `<div class="tb-title">WOO-SE-GIROK</div>` +
+            `<div class="tb-votes">` +
+              t.votes.map((v) => `<span class="vote ${v || 'none'}"></span>`).join('') +
+            `</div>`;
+        }
       } else if (st.phase === 'ivr') {
         ov.className = 'overlay';
         ov.innerHTML =
-          `<div class="ov-ivr">VIDEO REPLAY ${sideTxt(st.ivrBy)}</div>` +
-          `<div class="ov-cam">🎥</div>`;
+          `<div class="ov-ivr">${ivrTitle(st.ivrKind, st.ivrBy)}</div>` +
+          `<div class="ov-cam">${st.ivrKind === 'technical' ? '🟩' : '🎥'}</div>` +
+          (st.ivrKind === 'referee' ? `<div class="ov-sub">REQUEST BY REFEREE</div>` : '');
       } else if (st.ivrResult) {
-        const ok = st.ivrResult.result === 'accept';
+        const r = st.ivrResult;
+        const ok = r.result === 'accept';
         ov.className = 'overlay';
         ov.innerHTML =
-          `<div class="ov-ivr">VIDEO REPLAY ${sideTxt(st.ivrResult.by)}</div>` +
+          `<div class="ov-ivr">${ivrTitle(r.kind, r.by)}</div>` +
           `<div class="ov-mark ${ok ? 'ok' : 'no'}">${ok ? '○' : '✕'}</div>` +
           `<div class="ov-ivr">${ok ? 'ACCEPTED' : 'REJECTED'}</div>`;
       } else {
@@ -122,14 +154,14 @@
     // ===== TOMBOL TES (di jendela scoreboard) =====
     const send = (type, payload) => ipcRenderer.send('cmd', type, payload);
     const keys = {
-      q: () => send('add', { side: 'chung', pts: 1 }),
-      a: () => send('add', { side: 'chung', pts: 2 }),
-      z: () => send('add', { side: 'chung', pts: 3 }),
-      w: () => send('gamjeom', { side: 'chung', delta: 1 }),
-      p: () => send('add', { side: 'hong', pts: 1 }),
-      k: () => send('add', { side: 'hong', pts: 2 }),
-      m: () => send('add', { side: 'hong', pts: 3 }),
-      o: () => send('gamjeom', { side: 'hong', delta: 1 }),
+      q: () => send('score', { side: 'chung', tech: 'punch' }),
+      a: () => send('score', { side: 'chung', tech: 'trunk' }),
+      z: () => send('score', { side: 'chung', tech: 'head' }),
+      w: () => send('gj', { side: 'chung', reason: 'umum' }),
+      p: () => send('score', { side: 'hong', tech: 'punch' }),
+      k: () => send('score', { side: 'hong', tech: 'trunk' }),
+      m: () => send('score', { side: 'hong', tech: 'head' }),
+      o: () => send('gj', { side: 'hong', reason: 'umum' }),
       ' ': () => send(last && last.phase === 'running' ? 'pause' : 'start'),
       n: () => send('newMatch'),
       f: () => ipcRenderer.send('fullscreen'),

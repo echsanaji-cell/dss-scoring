@@ -21,12 +21,20 @@
   <!-- Dua sisi: dibuat lewat JS di bawah -->
   <div class="op-main" id="sides"></div>
 
-  <!-- Pilih pemenang ronde jika skor seri -->
-  <div class="sup">
-    <span>Skor seri, pilih pemenang ronde (keputusan juri):</span>
-    <button class="b-chung" data-sup="chung">CHUNG MENANG</button>
-    <button class="b-hong" data-sup="hong">HONG MENANG</button>
+  <!-- Alasan Gam-jeom -->
+  <div class="op-gjbar">
+    <span>Alasan Gam-jeom berikutnya:</span>
+    <select id="gjReason"></select>
+    <span class="gj-hint" id="gjHint"></span>
   </div>
+
+  <!-- Tiebreaker -->
+  <div class="tie">
+    <div class="tie-head">⚖ SKOR SERI: TIEBREAKER</div>
+    <div id="tieInfo"></div>
+    <div id="votes"></div>
+  </div>
+
   <!-- Panel Kyeshi / cedera -->
   <div class="inj">
     <span>Kyeshi berjalan. Atlet bisa lanjut, atau tetapkan pemenang jika tidak bisa lanjut:</span>
@@ -34,42 +42,70 @@
     <button class="b-chung" data-injwin="chung">CHUNG MENANG</button>
     <button class="b-hong" data-injwin="hong">HONG MENANG</button>
   </div>
-  <!-- Panel IVR -->
+
+  <!-- Panel IVR / Kartu Teknis -->
   <div class="ivr">
-    <div class="ivr-head">🎥 INSTANT VIDEO REPLAY: <b id="ivrBy"></b> · sisa <b id="ivrTime">30</b> detik</div>
-    <div class="ivr-row"><span>Koreksi untuk</span>
+    <div class="ivr-head" id="ivrHead"></div>
+    <div class="ivr-row" id="ivrReq">
+      <span>Pemohon</span>
+      <button class="b-chung" data-req="chung">COACH CHUNG</button>
+      <button class="b-hong" data-req="hong">COACH HONG</button>
+      <button data-req="wasit">WASIT</button>
+    </div>
+    <div class="ivr-row"><span>Alasan</span><select id="ivrReason"></select></div>
+    <div class="ivr-row">
+      <span>Atlet</span>
       <button class="b-chung" data-ivrp="chung">CHUNG</button>
       <button class="b-hong" data-ivrp="hong">HONG</button>
+      <small class="muted">Untuk Gam-jeom: pilih atlet yang DIKENAI Gam-jeom</small>
     </div>
-    <div class="ivr-row"><span>Jenis</span>
+    <div class="ivr-row">
+      <span>Jenis</span>
       <button data-ivrk="gj">Gam-jeom</button>
-      <button data-ivrk="1">1 Pukulan</button>
-      <button data-ivrk="2">2 Badan</button>
-      <button data-ivrk="3">3 Kepala</button>
-      <button data-ivrk="4">4 Putar badan</button>
-      <button data-ivrk="6">6 Putar kepala</button>
+      <button data-ivrk="punch">1 Pukulan</button>
+      <button data-ivrk="trunk">2 Badan</button>
+      <button data-ivrk="head">3 Kepala</button>
+      <button data-ivrk="trunk-turn">4 Putar badan</button>
+      <button data-ivrk="head-turn">6 Putar kepala</button>
     </div>
-    <div class="ivr-row"><span>Aksi</span>
+    <div class="ivr-row">
+      <span>Aksi</span>
       <button data-ivra="1">TAMBAH [+]</button>
       <button data-ivra="-1">KURANGI [−]</button>
+      <button id="btnAddAdj">➕ Masukkan ke daftar koreksi</button>
     </div>
     <div class="ivr-sel" id="ivrSel"></div>
+    <div class="ivr-list" id="ivrList"></div>
     <div class="ivr-row">
       <button class="b-start" id="btnAccept">ACCEPT [O]</button>
       <button class="b-reject" id="btnReject">REJECT [X]</button>
       <button id="btnIvrCancel">Batal (salah tekan)</button>
     </div>
   </div>
+
   <!-- Kontrol -->
   <div class="op-controls">
-    <button class="b-start" id="btnStart">▶ Shijak / Kye-sok (Spasi)</button>
-    <button class="b-pause" id="btnPause">⏸ Kal-yeo (Spasi)</button>
-    <button id="btnSign" class="b-sign">MODE: TAMBAH (+)</button>
-    <button id="btnTest" class="b-test">🧪 Test</button>
-    <button id="btnKyeshi" class="b-kye">⏱ Kyeshi (Dokter)</button>
-    <button id="btnNew" class="b-new">Match Baru</button>
-    <button id="btnSet" class="b-set">⚙ Pengaturan</button>
+    <button class="b-start" id="btnStart">▶ Shijak / Kye-sok</button>
+    <button class="b-pause" id="btnPause">⏸ Kal-yeo</button>
+    <button class="b-undo" id="btnUndo">↩ Undo</button>
+    <button class="b-test" id="btnTest">🧪 Test</button>
+    <button class="b-kye" id="btnKyeshi">⏱ Kyeshi (Dokter)</button>
   </div>
+  <div class="op-controls">
+    <button class="b-ref" id="btnIvrRef">🎥 IVR Wasit</button>
+    <button class="b-tech" id="btnTech">🟩 Kartu Teknis</button>
+    <button class="b-set" id="btnSet">⚙ Pengaturan</button>
+    <button class="b-new" id="btnNew">Match Baru</button>
+  </div>
+
+  <!-- Koreksi waktu -->
+  <div class="op-time">
+    <span>Koreksi waktu (saat Kal-yeo):</span>
+    <input id="tMin" type="number" min="0" max="99"> :
+    <input id="tSec" type="number" min="0" max="59">
+    <button id="btnSetTime">Set waktu</button>
+  </div>
+
   <!-- Pengaturan -->
   <div class="op-settings hidden" id="settings">
     <label>Waktu ronde (detik) <input id="sRound" type="number" min="10"></label>
@@ -78,7 +114,14 @@
     <label><input id="sGapOn" type="checkbox"> Point gap aktif</label>
     <label>Selisih point gap <input id="sGap" type="number" min="1"></label>
     <label>Kuota IVR / pertandingan <input id="sIvr" type="number" min="0"></label>
+    <label>Jumlah juri
+      <select id="sJudge"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+    </label>
   </div>
+
+  <!-- Log kejadian -->
+  <div class="op-log" id="log"></div>
+
   <!-- Rekap ronde -->
   <table class="op-table" id="recap"></table>
 
@@ -87,10 +130,22 @@
     const $ = (id) => document.getElementById(id);
     const send = (type, payload) => ipcRenderer.send('cmd', type, payload);
     const fmt = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
-    const PTS = [[1, 'Pukulan'], [2, 'Badan'], [3, 'Kepala'], [4, 'Putar Badan'], [6, 'Putar Kepala']];
 
-    let sign = 1;   // +1 = tambah, -1 = kurangi (koreksi)
+    const TECHS = [['punch', 1, 'Pukulan'], ['trunk', 2, 'Badan'], ['head', 3, 'Kepala'], ['trunk-turn', 4, 'Putar badan'], ['head-turn', 6, 'Putar kepala']];
+    const TECH_NAME = Object.fromEntries(TECHS.map(([k, , t]) => [k, t]));
+    const SIDE = { chung: 'CHUNG', hong: 'HONG', wasit: 'WASIT' };
+    const IVR_NAME = { coach: 'IVR Coach', referee: 'IVR Wasit', technical: 'Kartu Teknis' };
+    const voterNames = (n) => (n === 3 ? ['Judge 1', 'Judge 2', 'Judge 3']
+      : n === 2 ? ['Center Referee', 'Judge 1', 'Judge 2']
+      : ['Center Referee', 'Judge', 'Review Jury']);
+
     let last = null;
+    let gjFilled = false;
+    let lastTimeKey = '';
+    let lastIvrKind = null;
+    let ivrReq = 'wasit';
+    let adj = { side: null, kind: null, sign: 1 };
+    let adjs = [];
 
     // ----- bangun tampilan dua sisi -----
     function sideHTML(s, label) {
@@ -103,25 +158,85 @@
         </div>
         <div class="op-score" id="${s}Score">0</div>
         <div class="op-pts">
-          ${PTS.map(([n, t]) => `<button data-side="${s}" data-pts="${n}">+${n}<small>${t}</small></button>`).join('')}
+          ${TECHS.map(([k, n, t]) => `<button data-side="${s}" data-tech="${k}">+${n}<small>${t}</small></button>`).join('')}
         </div>
-        <button class="op-gj" data-gj="${s}">GAM-JEOM: <b id="${s}Gj">0</b></button>
-        <button class="op-ivrbtn" data-ivr="${s}">🎥 IVR (sisa <b id="${s}Ivr">1</b>)</button>
+        <button class="op-gj" data-gj="${s}">GAM-JEOM <b id="${s}Gj">0</b> <small id="${s}GjPts"></small></button>
+        <button class="op-ivrbtn" data-ivr="${s}">🎥 IVR Coach (sisa <b id="${s}Ivr">1</b>)</button>
         <div class="op-wins">Ronde menang: <b id="${s}Wins">0</b></div>
       </div>`;
     }
     $('sides').innerHTML = sideHTML('chung', 'CHUNG (BIRU)') + sideHTML('hong', 'HONG (MERAH)');
 
-    // ----- tampilkan state -----
     function setVal(id, v) {
       const el = $(id);
       if (document.activeElement !== el) el.value = v; // jangan ganggu saat sedang mengetik
     }
 
+    // ----- Gam-jeom: poin untuk lawan (+2 jika pasif di 10 detik terakhir) -----
+    function gjPts() {
+      if (!last) return 1;
+      const r = last.meta.gj.find((x) => x[0] === $('gjReason').value);
+      const late = (last.phase === 'running' || last.phase === 'paused') && last.timeLeft <= 10;
+      return r && r[2] && late ? 2 : 1;
+    }
+    function showGjHint() {
+      const p = gjPts();
+      for (const s of ['chung', 'hong']) $(s + 'GjPts').textContent = '(lawan +' + p + ')';
+      $('gjHint').textContent = p === 2 ? 'Pasif di 10 detik terakhir: 2 poin untuk lawan' : '';
+    }
+
+    // ----- IVR: pilihan koreksi -----
+    function adjLabel(a) {
+      return `${a.sign > 0 ? '+' : '−'} ${a.kind === 'gj' ? 'Gam-jeom' : TECH_NAME[a.kind]} → ${SIDE[a.side]}`;
+    }
+    function showIvrSel() {
+      document.querySelectorAll('[data-ivrp]').forEach((b) => b.classList.toggle('sel', b.dataset.ivrp === adj.side));
+      document.querySelectorAll('[data-ivrk]').forEach((b) => b.classList.toggle('sel', b.dataset.ivrk === adj.kind));
+      document.querySelectorAll('[data-ivra]').forEach((b) => b.classList.toggle('sel', Number(b.dataset.ivra) === adj.sign));
+      document.querySelectorAll('[data-req]').forEach((b) => b.classList.toggle('sel', b.dataset.req === ivrReq));
+      $('ivrSel').textContent = adj.side && adj.kind
+        ? 'Koreksi dipilih: ' + adjLabel(adj)
+        : 'Pilih atlet, jenis, dan aksi untuk menambah koreksi (opsional)';
+      $('ivrList').innerHTML = adjs.length
+        ? adjs.map((a, n) => `<span class="chip">${adjLabel(a)} <button data-adjdel="${n}">✕</button></span>`).join('')
+        : '<span class="muted">Belum ada koreksi di daftar</span>';
+    }
+
+    // ----- log kejadian -----
+    function logHTML(st) {
+      const canDel = ['running', 'paused', 'rest', 'tie'].includes(st.phase) ||
+        (st.phase === 'ended' && st.endedBy === 'round');
+      const gjName = (code) => (st.meta.gj.find((x) => x[0] === code) || [0, code])[1];
+      const rows = st.events.slice().reverse().slice(0, 40).map((e) => {
+        let txt = '';
+        if (e.kind === 'score') txt = `${SIDE[e.side]}: ${TECH_NAME[e.tech]} +${e.pts}`;
+        else if (e.kind === 'gj') txt = `${SIDE[e.side]} kena Gam-jeom (${gjName(e.reason)}), lawan +${e.pts}`;
+        else if (e.kind === 'ivr') {
+          txt = `${IVR_NAME[e.ivrKind]}${e.by ? ' ' + SIDE[e.by] : ''}: ${e.result === 'accept' ? 'ACCEPT' : 'REJECT'}${e.reason ? ' · ' + e.reason : ''}`;
+        }
+        const note = e.note ? ` <small>(${e.note})</small>` : '';
+        const del = e.kind !== 'ivr' && e.round === st.round && canDel
+          ? `<button class="x" data-del="${e.id}">✕</button>` : '';
+        return `<tr class="${e.kind}"><td>R${e.round}</td><td>${fmt(e.t)}</td><td>${txt}${note}</td><td>${del}</td></tr>`;
+      });
+      return rows.length
+        ? `<table><tr><th>Ronde</th><th>Waktu</th><th>Kejadian</th><th></th></tr>${rows.join('')}</table>`
+        : '<div class="muted" style="padding:10px">Belum ada kejadian</div>';
+    }
+
+    // ----- tampilkan state -----
     function render(st) {
       last = st;
       const i = st.round - 1;
+      const scoring = st.phase === 'running' || st.phase === 'paused';
       document.body.dataset.phase = st.phase;
+
+      if (!gjFilled) {
+        $('gjReason').innerHTML = st.meta.gj
+          .filter((r) => r[0] !== 'kartu-ditolak')
+          .map(([k, n, p]) => `<option value="${k}">${n}${p ? ' (pasif)' : ''}</option>`).join('');
+        gjFilled = true;
+      }
 
       setVal('category', st.category);
       setVal('matchNo', st.matchNo);
@@ -131,17 +246,62 @@
         $(s + 'Score').textContent = st.points[s][i];
         $(s + 'Gj').textContent = st.gamjeom[s][i];
         $(s + 'Wins').textContent = st.roundWinner.filter((x) => x === s).length;
+        $(s + 'Ivr').textContent = st.ivr[s];
+        document.querySelector(`[data-ivr="${s}"]`).disabled = !(st.ivr[s] > 0 && scoring);
       }
+      $('btnIvrRef').disabled = !scoring;
+      $('btnTech').disabled = !scoring;
+      showGjHint();
 
       const names = {
         waiting: 'SIAP', running: 'BERJALAN', paused: 'KAL-YEO', rest: 'ISTIRAHAT',
-        superiority: 'SERI (SUPERIORITY)', ended: 'SELESAI', test: 'TEST MODE',
-        kyeshi: 'KYESHI',
-        ivr: 'IVR',        
+        tie: 'TIEBREAKER', ended: 'SELESAI', test: 'TEST MODE', kyeshi: 'KYESHI', ivr: 'IVR / KARTU TEKNIS',
       };
       $('phase').textContent = names[st.phase];
       $('round').textContent = 'Ronde ' + st.round;
       $('timer').textContent = fmt(st.phase === 'kyeshi' ? st.injuryTime : st.timeLeft);
+
+      // isi kotak koreksi waktu hanya saat fase/ronde berubah
+      const tkey = st.phase + ':' + st.round;
+      if (tkey !== lastTimeKey) {
+        lastTimeKey = tkey;
+        $('tMin').value = Math.floor(st.timeLeft / 60);
+        $('tSec').value = String(st.timeLeft % 60).padStart(2, '0');
+      }
+
+      // panel IVR / kartu teknis
+      if (st.phase !== 'ivr') {
+        adj = { side: null, kind: null, sign: 1 };
+        adjs = [];
+        ivrReq = 'wasit';
+        lastIvrKind = null;
+      } else {
+        $('ivrHead').textContent = `🎥 ${IVR_NAME[st.ivrKind]}${st.ivrBy ? ' – ' + SIDE[st.ivrBy] : ''} · Review Jury: sisa ${st.ivrTime} detik`;
+        $('ivrReq').style.display = st.ivrKind === 'technical' ? 'flex' : 'none';
+        if (st.ivrKind !== lastIvrKind) {
+          lastIvrKind = st.ivrKind;
+          $('ivrReason').innerHTML = st.meta.ivr[st.ivrKind].map((r) => `<option>${r}</option>`).join('');
+        }
+      }
+      showIvrSel();
+
+      // panel tiebreaker
+      if (st.phase === 'tie') {
+        const t = st.tie;
+        if (t.stage === 'steps') {
+          const s = t.steps[t.shown];
+          $('tieInfo').textContent = `Menampilkan kriteria ${t.shown + 1}/${t.steps.length}: ${s.title} (Chung ${s.chung} – Hong ${s.hong})`;
+          $('votes').innerHTML = '';
+        } else {
+          $('tieInfo').textContent = 'Semua kriteria sama. WOO-SE-GIROK: masukkan pilihan tiap pemberi suara (pemenang = 2 dari 3 suara).';
+          $('votes').innerHTML = voterNames(st.settings.judgeCount).map((n, v) => `
+            <div class="ivr-row"><span>${n}</span>
+              <button class="b-chung ${t.votes[v] === 'chung' ? 'sel' : ''}" data-voter="${v}" data-vside="chung">CHUNG</button>
+              <button class="b-hong ${t.votes[v] === 'hong' ? 'sel' : ''}" data-voter="${v}" data-vside="hong">HONG</button>
+            </div>`).join('');
+        }
+      }
+
       // pengaturan
       const S = st.settings;
       setVal('sRound', S.roundTime);
@@ -150,17 +310,10 @@
       setVal('sGap', S.pointGap);
       setVal('sIvr', S.ivrQuota);
       if (document.activeElement !== $('sGapOn')) $('sGapOn').checked = S.pointGapOn;
-      // IVR
-      for (const s of ['chung', 'hong']) {
-        $(s + 'Ivr').textContent = st.ivr[s];
-        document.querySelector(`[data-ivr="${s}"]`).disabled =
-          !(st.ivr[s] > 0 && (st.phase === 'running' || st.phase === 'paused'));
-      }
-      $('ivrBy').textContent = st.ivrBy === 'chung' ? 'CHUNG (BIRU)' : st.ivrBy === 'hong' ? 'HONG (MERAH)' : '';
-      $('ivrTime').textContent = st.ivrTime;
-      if (st.phase !== 'ivr') ivrAdj = { side: null, kind: null, sign: 1 };
-      showIvrSel();
-      // tabel rekap
+      if (document.activeElement !== $('sJudge')) $('sJudge').value = String(S.judgeCount);
+
+      // log dan rekap
+      $('log').innerHTML = logHTML(st);
       let rows = '<tr><th>Ronde</th><th>Chung</th><th>GJ</th><th>Hong</th><th>GJ</th><th>Pemenang</th></tr>';
       for (let r = 0; r < 3; r++) {
         const w = st.roundWinner[r];
@@ -179,24 +332,60 @@
     document.addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
-      if (b.dataset.pts) send('add', { side: b.dataset.side, pts: sign * Number(b.dataset.pts) });
-      if (b.dataset.gj) send('gamjeom', { side: b.dataset.gj, delta: sign });
-      if (b.dataset.sup) send('superiority', { side: b.dataset.sup });
+      if (b.dataset.tech) send('score', { side: b.dataset.side, tech: b.dataset.tech });
+      if (b.dataset.gj) {
+        send('gj', { side: b.dataset.gj, reason: $('gjReason').value });
+        $('gjReason').value = 'umum';
+        showGjHint();
+      }
+      if (b.dataset.ivr) send('ivr', { kind: 'coach', side: b.dataset.ivr });
+      if (b.dataset.ivrp) { adj.side = b.dataset.ivrp; showIvrSel(); }
+      if (b.dataset.ivrk) { adj.kind = b.dataset.ivrk; showIvrSel(); }
+      if (b.dataset.ivra) { adj.sign = Number(b.dataset.ivra); showIvrSel(); }
+      if (b.dataset.req) { ivrReq = b.dataset.req; showIvrSel(); }
+      if (b.dataset.adjdel) { adjs.splice(Number(b.dataset.adjdel), 1); showIvrSel(); }
       if (b.dataset.injwin) send('injuryWin', { side: b.dataset.injwin });
-      if (b.dataset.ivr) send('ivr', { side: b.dataset.ivr });
-      if (b.dataset.ivrp) { ivrAdj.side = b.dataset.ivrp; showIvrSel(); }
-      if (b.dataset.ivrk) { ivrAdj.kind = b.dataset.ivrk; showIvrSel(); }
-      if (b.dataset.ivra) { ivrAdj.sign = Number(b.dataset.ivra); showIvrSel(); }
+      if (b.dataset.voter) send('vote', { voter: Number(b.dataset.voter), side: b.dataset.vside });
+      if (b.dataset.del) send('del', { id: Number(b.dataset.del) });
     });
+
+    $('gjReason').onchange = showGjHint;
 
     $('btnStart').onclick = () => send('start');
     $('btnPause').onclick = () => send('pause');
+    $('btnUndo').onclick = () => send('undo');
+    $('btnTest').onclick = () => send('test');
+    $('btnKyeshi').onclick = () => send('kyeshi');
+    $('btnResume').onclick = () => send('resume');
+    $('btnIvrRef').onclick = () => send('ivr', { kind: 'referee' });
+    $('btnTech').onclick = () => send('ivr', { kind: 'technical' });
     $('btnNew').onclick = () => { if (confirm('Mulai pertandingan baru? Skor sekarang akan dihapus.')) send('newMatch'); };
-    $('btnSign').onclick = () => {
-      sign = -sign;
-      $('btnSign').textContent = sign === 1 ? 'MODE: TAMBAH (+)' : 'MODE: KURANGI (−) koreksi';
-      document.body.classList.toggle('minus', sign === -1);
+    $('btnSet').onclick = () => $('settings').classList.toggle('hidden');
+    $('btnSetTime').onclick = () => send('setTime', {
+      seconds: (Number($('tMin').value) || 0) * 60 + (Number($('tSec').value) || 0),
+    });
+
+    // ----- IVR: masukkan koreksi, accept, reject, batal -----
+    $('btnAddAdj').onclick = () => {
+      if (adj.side && adj.kind) {
+        adjs.push({ ...adj });
+        adj = { side: null, kind: null, sign: adj.sign };
+        showIvrSel();
+      }
     };
+    function ivrDecide(result) {
+      const list = adjs.slice();
+      if (adj.side && adj.kind) list.push({ ...adj }); // koreksi yang sudah dipilih tapi belum dimasukkan
+      send('ivrDecide', {
+        result,
+        reason: $('ivrReason').value,
+        requester: ivrReq,
+        adjs: result === 'accept' ? list : [],
+      });
+    }
+    $('btnAccept').onclick = () => ivrDecide('accept');
+    $('btnReject').onclick = () => ivrDecide('reject');
+    $('btnIvrCancel').onclick = () => send('ivrCancel');
 
     // ----- simpan nama/kategori saat selesai diubah -----
     for (const id of ['category', 'matchNo', 'chungName', 'chungCountry', 'hongName', 'hongCountry']) {
@@ -207,16 +396,8 @@
       }));
     }
 
-    // spasi = start / pause
-    document.addEventListener('keydown', (e) => {
-      if (e.key === ' ' && e.target.tagName !== 'INPUT') {
-        e.preventDefault();
-        send(last && last.phase === 'running' ? 'pause' : 'start');
-      }
-    });
     // ----- pengaturan -----
-    $('btnSet').onclick = () => $('settings').classList.toggle('hidden');
-        for (const id of ['sRound', 'sRest', 'sGj', 'sGapOn', 'sGap', 'sIvr']) {
+    for (const id of ['sRound', 'sRest', 'sGj', 'sGapOn', 'sGap', 'sIvr', 'sJudge']) {
       $(id).addEventListener('change', () => {
         const q = parseInt($('sIvr').value, 10);
         send('setSettings', {
@@ -226,42 +407,18 @@
           pointGapOn: $('sGapOn').checked,
           pointGap: Math.max(1, Number($('sGap').value) || 15),
           ivrQuota: Number.isNaN(q) ? 1 : Math.max(0, q),
+          judgeCount: Number($('sJudge').value) || 1,
         });
       });
     }
 
-    // ----- IVR -----
-    let ivrAdj = { side: null, kind: null, sign: 1 };
-
-    function showIvrSel() {
-      document.querySelectorAll('[data-ivrp]').forEach((b) => b.classList.toggle('sel', b.dataset.ivrp === ivrAdj.side));
-      document.querySelectorAll('[data-ivrk]').forEach((b) => b.classList.toggle('sel', b.dataset.ivrk === ivrAdj.kind));
-      document.querySelectorAll('[data-ivra]').forEach((b) => b.classList.toggle('sel', Number(b.dataset.ivra) === ivrAdj.sign));
-      const ready = ivrAdj.side && ivrAdj.kind;
-      $('ivrSel').textContent = ready
-        ? `Koreksi: ${ivrAdj.sign === 1 ? 'TAMBAH' : 'KURANGI'} ${ivrAdj.kind === 'gj' ? 'Gam-jeom' : ivrAdj.kind + ' poin'} untuk ${ivrAdj.side === 'chung' ? 'CHUNG' : 'HONG'}`
-        : 'Tanpa koreksi poin (pilih untuk siapa dan jenisnya jika perlu)';
-    }
-
-    function ivrDecide(result) {
-      const ok = ivrAdj.side && ivrAdj.kind;
-      send('ivrDecide', {
-        result,
-        adj: result === 'accept' && ok ? {
-          side: ivrAdj.side,
-          kind: ivrAdj.kind === 'gj' ? 'gj' : 'pts',
-          value: ivrAdj.kind === 'gj' ? 1 : Number(ivrAdj.kind),
-          sign: ivrAdj.sign,
-        } : null,
-      });
-    }
-    $('btnAccept').onclick = () => ivrDecide('accept');
-    $('btnReject').onclick = () => ivrDecide('reject');
-    $('btnIvrCancel').onclick = () => send('ivrCancel');
-    // ----- test, doctor, kyeshi -----
-    $('btnTest').onclick = () => send('test');
-    $('btnKyeshi').onclick = () => send('kyeshi');
-    $('btnResume').onclick = () => send('resume');
+    // spasi = start / pause
+    document.addEventListener('keydown', (e) => {
+      if (e.key === ' ' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) {
+        e.preventDefault();
+        send(last && last.phase === 'running' ? 'pause' : 'start');
+      }
+    });
   </script>
 </body>
 </html>
