@@ -6,10 +6,31 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="scoreboard" data-phase="waiting">
+  <!-- gambar ikon serangan (dipakai lewat <use>) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <g id="ic-trunk" fill="currentColor" stroke="rgba(0,0,0,.45)" stroke-width="2" stroke-linejoin="round">
+        <path d="M22 6 L26 6 Q32 15 38 6 L42 6 L58 14 L52 30 L48 28 L48 56 Q48 58 46 58 L18 58 Q16 58 16 56 L16 28 L12 30 L6 14 Z"/>
+        <path d="M32 18 L32 56" fill="none"/>
+      </g>
+      <g id="ic-head" fill="currentColor" stroke="rgba(0,0,0,.45)" stroke-width="2" stroke-linejoin="round" fill-rule="evenodd">
+        <path d="M32 6 C16 6 8 18 8 32 L8 46 Q8 54 16 54 L22 54 L22 46 Q22 42 26 42 L38 42 Q42 42 42 46 L42 54 L48 54 Q56 54 56 46 L56 32 C56 18 48 6 32 6 Z M20 26 Q20 22 24 22 L40 22 Q44 22 44 26 L44 34 Q44 38 40 38 L24 38 Q20 38 20 34 Z"/>
+      </g>
+      <g id="ic-fist" fill="currentColor" stroke="rgba(0,0,0,.45)" stroke-width="2" stroke-linejoin="round">
+        <rect x="12" y="14" width="10" height="22" rx="5"/>
+        <rect x="22" y="10" width="10" height="26" rx="5"/>
+        <rect x="32" y="10" width="10" height="26" rx="5"/>
+        <rect x="42" y="14" width="10" height="22" rx="5"/>
+        <rect x="12" y="28" width="40" height="26" rx="9"/>
+        <rect x="10" y="40" width="26" height="11" rx="5.5"/>
+      </g>
+    </defs>
+  </svg>
   <div class="category" id="category"></div>
 
   <div class="main">
     <div class="side chung">
+      <div class="hits" id="chungHits"></div>
       <div>
         <div class="name" id="chungName"></div>
         <div class="country" id="chungCountry"></div>
@@ -29,6 +50,7 @@
     </div>
 
     <div class="side hong">
+      <div class="hits" id="hongHits"></div>
       <div>
         <div class="name" id="hongName"></div>
         <div class="country" id="hongCountry"></div>
@@ -85,6 +107,26 @@
       return 'VIDEO REPLAY';
     }
 
+    // ikon serangan yang masuk (ronde berjalan); kuning = teknik putar (4 dan 6 poin)
+    const HIT_ICON = { punch: 'fist', trunk: 'trunk', 'trunk-turn': 'trunk', head: 'head', 'head-turn': 'head' };
+    const seenHits = new Set();
+    const hitSig = { chung: '', hong: '' };
+
+    function renderHits(st, s) {
+      if (!st.events.length) seenHits.clear();
+      const hits = st.events
+        .filter((e) => e.kind === 'score' && e.side === s && e.round === st.round && HIT_ICON[e.tech])
+        .slice(-14);
+      const sig = st.round + ':' + hits.map((e) => e.id).join(',');
+      if (sig === hitSig[s]) return; // tidak berubah -> jangan gambar ulang (animasi tidak terulang)
+      hitSig[s] = sig;
+      $(s + 'Hits').innerHTML = hits.map((e) => {
+        const cls = 'hit' + (e.tech.endsWith('-turn') ? ' hi' : '') + (seenHits.has(e.id) ? '' : ' new');
+        return `<svg class="${cls}" viewBox="0 0 64 64"><use href="#ic-${HIT_ICON[e.tech]}"/></svg>`;
+      }).join('');
+      hits.forEach((e) => seenHits.add(e.id));
+    }
+
     function render(st) {
       last = st;
       const i = st.round - 1;
@@ -101,6 +143,7 @@
           .map((n) => `<span class="dot ${n < w ? 'on' : ''}"></span>`)
           .join('');
         $(s + 'Cam').style.opacity = st.ivr && st.ivr[s] > 0 ? 1 : 0.2;
+        renderHits(st, s);
       }
 
       sync = { st, at: performance.now() };
@@ -111,6 +154,7 @@
         waiting: 'MATCH ' + st.matchNo,
         running: 'MATCH ' + st.matchNo,
         paused: 'KAL-YEO',
+        timeUp: 'TIME UP',
         roundEnd: 'ROUND END',
         rest: 'BREAK TIME',
         tie: 'TIEBREAKER',

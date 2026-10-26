@@ -277,3 +277,27 @@ body[data-phase="roundEnd"] .rend { display: flex; }
 .rend span { flex: 1; }
 .rw-score { font-size: 12vh; font-weight: 800; }
 body[data-phase="roundEnd"] .timer { background: #2e7d32; color: #fff; }
+
+/* ===== Waktu habis: masih bisa edit ===== */
+.tup { display: none; gap: 12px; align-items: center; margin-top: 12px; padding: 12px; background: #4a2a00; border-radius: 8px; }
+body[data-phase="timeUp"] .tup { display: flex; }
+.tup span { flex: 1; }
+body[data-phase="timeUp"] .timer { background: #c62828; color: #fff; }
+.b-reopen { background: #6a1b9a !important; }
+
+/* ===== Ikon serangan di scoreboard ===== */
+.side { position: relative; }
+.hits {
+  position: absolute; top: 17vh; width: 16vh; max-height: 62vh;
+  display: flex; flex-direction: column; flex-wrap: wrap; align-content: flex-start;
+  gap: 1vh; pointer-events: none;
+}
+.side.chung .hits { left: 1vw; }
+.side.hong .hits { right: 1vw; flex-wrap: wrap-reverse; }
+.hit { width: 7vh; height: 7vh; color: #fff; filter: drop-shadow(0 0 .4vh rgba(0, 0, 0, .6)); }
+.hit.hi { color: #ffd600; filter: drop-shadow(0 0 1vh rgba(255, 214, 0, .9)); }
+.hit.new { animation: hitpop .45s ease-out; }
+@keyframes hitpop {
+  from { transform: scale(2.4); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}

@@ -30,6 +30,12 @@
     <div id="votes"></div>
   </div>
 
+  <!-- Waktu habis: masih bisa edit sampai operator konfirmasi -->
+  <div class="tup">
+    <span id="tupInfo"></span>
+    <button class="b-start" id="btnFinish">✔ KONFIRMASI HASIL RONDE</button>
+  </div>
+
   <!-- Ronde selesai: tunggu operator memulai istirahat -->
   <div class="rend">
     <span id="rendInfo"></span>
@@ -95,6 +101,7 @@
   <div class="op-controls">
     <button class="b-ref" id="btnIvrRef">🎥 IVR Wasit</button>
     <button class="b-tech" id="btnTech">🟩 Kartu Teknis</button>
+    <button class="b-reopen" id="btnReopen">✎ Buka kembali ronde</button>
     <button class="b-set" id="btnSet">⚙ Pengaturan</button>
     <button class="b-new" id="btnNew">Match Baru</button>
   </div>
@@ -175,7 +182,7 @@
 
     // ----- Gam-jeom pasif: aktif hanya di 10 detik terakhir ronde (Gam-jeom tetap 1, lawan +2) -----
     function showGjHint() {
-      const on = !!last && (last.phase === 'running' || last.phase === 'paused') && last.timeLeft < 10;
+      const on = !!last && ['running', 'paused', 'timeUp'].includes(last.phase) && last.timeLeft < 10;
       for (const s of ['chung', 'hong']) {
         $(s + 'GjPts').textContent = on ? '(lawan +2)' : '(aktif ≤10 detik)';
       }
@@ -225,7 +232,7 @@
     function render(st) {
       last = st;
       const i = st.round - 1;
-      const scoring = st.phase === 'running' || st.phase === 'paused';
+      const scoring = st.phase === 'running' || st.phase === 'paused' || st.phase === 'timeUp';
       document.body.dataset.phase = st.phase;
 
       setVal('category', st.category);
@@ -244,7 +251,7 @@
       showGjHint();
 
       const names = {
-        waiting: 'SIAP', running: 'BERJALAN', paused: 'KAL-YEO', roundEnd: 'RONDE SELESAI', rest: 'ISTIRAHAT',
+        waiting: 'SIAP', running: 'BERJALAN', paused: 'KAL-YEO', timeUp: 'WAKTU HABIS', roundEnd: 'RONDE SELESAI', rest: 'ISTIRAHAT',
         tie: 'TIEBREAKER', ended: 'SELESAI', test: 'TEST MODE', kyeshi: 'KYESHI', ivr: 'IVR / KARTU TEKNIS',
       };
       $('phase').textContent = names[st.phase];
@@ -274,6 +281,16 @@
         }
       }
       showIvrSel();
+
+      // waktu habis: ronde belum ditutup
+      if (st.phase === 'timeUp') {
+        $('tupInfo').textContent =
+          `Waktu ronde ${st.round} habis. Skor CHUNG ${st.points.chung[i]} – HONG ${st.points.hong[i]} ` +
+          `(Gam-jeom ${st.gamjeom.chung[i]} – ${st.gamjeom.hong[i]}). Poin, Gam-jeom, IVR, dan kartu teknis masih bisa diproses. ` +
+          `Klik konfirmasi jika tidak ada permintaan lagi.`;
+      }
+      $('btnReopen').disabled = !(['roundEnd', 'rest', 'tie'].includes(st.phase) ||
+        (st.phase === 'ended' && st.endedBy === 'round'));
 
       // ronde selesai: pemenang tampil, tunggu operator memulai istirahat
       if (st.phase === 'roundEnd') {
@@ -366,6 +383,8 @@
     $('btnStart').onclick = () => send('start');
     $('btnPause').onclick = () => send('pause');
     $('btnUndo').onclick = () => send('undo');
+    $('btnFinish').onclick = () => send('finish');
+    $('btnReopen').onclick = () => send('reopen');
     $('btnTest').onclick = () => send('test');
     $('btnKyeshi').onclick = () => send('kyeshi');
     $('btnResume').onclick = () => send('resume');

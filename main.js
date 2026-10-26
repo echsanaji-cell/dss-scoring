@@ -94,6 +94,7 @@ function newMatch() {
     ivr: { chung: settings.ivrQuota, hong: settings.ivrQuota },
     ivrBy: null,      // coach yang meminta (khusus IVR coach)
     ivrKind: null,    // 'coach' | 'referee' | 'technical'
+    ivrFrom: 'paused',
     ivrTime: 0,
     ivrResult: null,
     ivrResultTime: 0,
@@ -162,7 +163,7 @@ function endRound(winner) {
 }
 
 function checkRound() {
-  if (state.phase !== 'running' && state.phase !== 'paused') return;
+  if (state.phase !== 'running' && state.phase !== 'paused' && state.phase !== 'timeUp') return;
   const i = cur();
   for (const s of ['chung', 'hong']) {
     if (state.gamjeom[s][i] >= settings.gamjeomLimit) return endRound(other(s));
@@ -182,9 +183,10 @@ function reopenIfNeeded() {
     state.roundWinner[cur()] = null;
     state.winner = null;
     state.endedBy = null;
-    state.phase = 'paused';
     state.timeLeft = state.savedTime;
     state.tenths = state.savedTenths || 0;
+    // waktu ronde sudah habis -> kembali ke masa edit "waktu habis"; jika belum -> Kal-yeo
+    state.phase = state.timeLeft === 0 && state.tenths === 0 ? 'timeUp' : 'paused';
   }
 }
 
@@ -227,7 +229,15 @@ function startTie() {
   };
 }
 
+// waktu ronde habis: ronde belum ditutup, masih ada permintaan coach/wasit yang bisa diproses
 function timeUp() {
+  state.timeLeft = 0;
+  state.tenths = 0;
+  state.phase = 'timeUp';
+}
+
+// operator mengonfirmasi hasil ronde setelah waktu habis
+function finishRound() {
   const i = cur();
   const c = state.points.chung[i];
   const h = state.points.hong[i];
@@ -254,7 +264,8 @@ function applyAdjs(adjs) {
 
 // ===== PERINTAH DARI OPERATOR / JOYSTICK =====
 function handle(type, p = {}) {
-  const scoring = state.phase === 'running' || state.phase === 'paused';
+  const live = state.phase === 'running' || state.phase === 'paused';
+  const scoring = live || state.phase === 'timeUp'; // saat waktu habis masih ada permintaan/koreksi
   switch (type) {
     case 'start': // Shijak / Kye-sok
       if (state.phase === 'waiting' || state.phase === 'paused') state.phase = 'running';
@@ -276,7 +287,7 @@ function handle(type, p = {}) {
 
     case 'undo':
     case 'del': { // hapus kejadian terakhir / kejadian tertentu (p = { id })
-      const okPhase = ['running', 'paused', 'roundEnd', 'rest', 'tie'].includes(state.phase) ||
+      const okPhase = ['running', 'paused', 'timeUp', 'roundEnd', 'rest', 'tie'].includes(state.phase) ||
         (state.phase === 'ended' && state.endedBy === 'round');
       if (!okPhase) break;
       let id = p.id;
@@ -292,10 +303,20 @@ function handle(type, p = {}) {
     }
 
     case 'setTime': // p = { seconds } koreksi waktu
-      if (['waiting', 'paused', 'ivr'].includes(state.phase)) {
+      if (['waiting', 'paused', 'ivr', 'timeUp'].includes(state.phase)) {
         state.timeLeft = Math.max(0, Math.min(5999, Math.floor(Number(p.seconds) || 0)));
         state.tenths = 0;
+        // waktu habis tapi ternyata masih ada sisa (masalah waktu): ronde dilanjutkan dari Kal-yeo
+        if (state.phase === 'timeUp' && state.timeLeft > 0) state.phase = 'paused';
       }
+      break;
+
+    case 'finish': // operator mengonfirmasi hasil ronde setelah waktu habis
+      if (state.phase === 'timeUp') finishRound();
+      break;
+    case 'reopen': // buka kembali ronde yang sudah ditutup (ada permintaan/perbaikan)
+      if (['roundEnd', 'rest', 'tie'].includes(state.phase) ||
+          (state.phase === 'ended' && state.endedBy === 'round')) reopenIfNeeded();
       break;
 
     case 'startRest': // operator memulai waktu istirahat setelah pemenang ronde tampil
@@ -322,7 +343,7 @@ function handle(type, p = {}) {
       break;
 
     case 'kyeshi': // timer cedera / dokter
-      if (scoring) {
+      if (live) {
         state.phase = 'kyeshi';
         state.injuryTime = settings.kyeshiTime;
       }
@@ -347,13 +368,14 @@ function handle(type, p = {}) {
           state.ivrBy = null;
         }
         state.ivrKind = p.kind;
+        state.ivrFrom = state.phase;
         state.phase = 'ivr';
         state.ivrTime = 30;
       }
       break;
     case 'ivrCancel': // batal, kuota tidak berkurang
       if (state.phase === 'ivr') {
-        state.phase = 'paused';
+        state.phase = state.ivrFrom === 'timeUp' && state.timeLeft === 0 ? 'timeUp' : 'paused';
         state.ivrBy = null;
         state.ivrKind = null;
       }
@@ -362,7 +384,7 @@ function handle(type, p = {}) {
       if (state.phase !== 'ivr') break;
       const kind = state.ivrKind;
       const by = kind === 'coach' ? state.ivrBy : (kind === 'technical' ? (p.requester || 'wasit') : null);
-      state.phase = 'paused';
+      state.phase = state.ivrFrom === 'timeUp' && state.timeLeft === 0 ? 'timeUp' : 'paused';
       if (p.result === 'accept') applyAdjs(p.adjs || []);
       if (p.result === 'reject') {
         if (kind === 'coach') state.ivr[by] = Math.max(0, state.ivr[by] - 1);
