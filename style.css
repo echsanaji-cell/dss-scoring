@@ -303,7 +303,7 @@ body[data-phase="timeUp"] .timer { background: #c62828; color: #fff; }
 }
 /* ===== Ikon serangan v4: gaya stiker (warna sisi + garis tepi putih), kuning untuk teknik putar ===== */
 .hits { width: 15vh; top: 15vh; max-height: 66vh; gap: .8vh; }
-.hit { width: 6.5vh; height: 6.5vh; color: #fff; }
+.hit { width: 4.0vh; height: 4.0vh; color: #fff; }
 .side.chung .hit { color: #0a5cf0; }
 .side.hong .hit  { color: #f0121f; }
 .side .hit.hi { color: #ffd400; filter: drop-shadow(0 0 1vh rgba(255, 212, 0, .95)); }

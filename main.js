@@ -484,7 +484,7 @@ function createWindow(file, opts = {}) {
     height: 720,
     backgroundColor: '#000000',
     autoHideMenuBar: true,
-    webPreferences: { nodeIntegration: true, contextIsolation: false },
+    webPreferences: { nodeIntegration: true, contextIsolation: false, autoplayPolicy: 'no-user-gesture-required' },
     ...opts,
   });
   win.loadFile(file);

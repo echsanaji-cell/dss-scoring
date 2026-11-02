@@ -158,7 +158,101 @@
       hits.forEach((e) => seenHits.add(e.id));
     }
 
+    // ===== SUARA (dibuat dengan Web Audio, tanpa file) =====
+    const SOUND_VOLUME = 0.8; // 0 sampai 1
+    let actx = null;
+    function audio() {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      return actx;
+    }
+
+    // Peluit wasit: dua nada tinggi bergetar + desis napas
+    function playWhistle() {
+      const ac = audio();
+      const t0 = ac.currentTime;
+      const dur = 0.7;
+      const master = ac.createGain();
+      master.gain.setValueAtTime(0.0001, t0);
+      master.gain.exponentialRampToValueAtTime(0.3 * SOUND_VOLUME, t0 + 0.03);
+      master.gain.setValueAtTime(0.3 * SOUND_VOLUME, t0 + dur - 0.12);
+      master.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      master.connect(ac.destination);
+
+      for (const f of [2850, 3000]) {
+        const o = ac.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = f;
+        const lfo = ac.createOscillator(); // getaran cepat seperti bola di dalam peluit
+        lfo.frequency.value = 32;
+        const lg = ac.createGain();
+        lg.gain.value = 110;
+        lfo.connect(lg);
+        lg.connect(o.frequency);
+        o.connect(master);
+        o.start(t0);
+        lfo.start(t0);
+        o.stop(t0 + dur);
+        lfo.stop(t0 + dur);
+      }
+
+      const nb = ac.createBuffer(1, Math.floor(ac.sampleRate * dur), ac.sampleRate);
+      const d = nb.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      const ns = ac.createBufferSource();
+      ns.buffer = nb;
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 3200;
+      bp.Q.value = 2;
+      const ng = ac.createGain();
+      ng.gain.value = 0.15;
+      ns.connect(bp);
+      bp.connect(ng);
+      ng.connect(master);
+      ns.start(t0);
+    }
+
+    // Bel: pukulan logam dengan nada sisa yang tidak harmonis
+    // decay = lama gema (detik). Bel ronde habis 2.2, bel hitung mundur istirahat 0.8
+    function playBell(decay) {
+      const ac = audio();
+      const t0 = ac.currentTime;
+      const base = 1050;
+      const master = ac.createGain();
+      master.gain.value = 0.3 * SOUND_VOLUME;
+      master.connect(ac.destination);
+      const partials = [[1, 1], [2.0, 0.6], [2.76, 0.5], [5.4, 0.25], [8.93, 0.12]];
+      for (const [ratio, amp] of partials) {
+        const o = ac.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = base * ratio;
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(amp, t0 + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + decay / Math.sqrt(ratio));
+        o.connect(g);
+        g.connect(master);
+        o.start(t0);
+        o.stop(t0 + decay + 0.1);
+      }
+    }
+
+    // pendeteksi kejadian suara: bandingkan state lama dan baru
+    function handleSounds(prev, st) {
+      if (!prev) return;
+      // 1. peluit saat timer ronde masuk di bawah 10 detik
+      if (prev.phase === 'running' && st.phase === 'running' && st.round === prev.round &&
+          prev.timeLeft >= 10 && st.timeLeft < 10) playWhistle();
+      // 2. bel saat waktu ronde habis
+      if (prev.phase === 'running' && st.phase === 'timeUp') playBell(2.2);
+      // 3. bel tiap detik di 5 detik terakhir waktu istirahat
+      if (st.phase === 'rest' && st.timeLeft >= 1 && st.timeLeft <= 5 &&
+          (prev.phase !== 'rest' || prev.timeLeft !== st.timeLeft)) playBell(0.8);
+    }
+
     function render(st) {
+      handleSounds(last, st);
       last = st;
       const i = st.round - 1;
       document.body.dataset.phase = st.phase;
@@ -272,6 +366,9 @@
       ' ': () => send(last && last.phase === 'running' ? 'pause' : 'start'),
       n: () => send('newMatch'),
       f: () => ipcRenderer.send('fullscreen'),
+      1: () => playWhistle(),
+      2: () => playBell(2.2),
+      3: () => playBell(0.8),
     };
     document.addEventListener('keydown', (e) => {
       const fn = keys[e.key.toLowerCase()];
