@@ -251,6 +251,26 @@
           (prev.phase !== 'rest' || prev.timeLeft !== st.timeLeft)) playBell(0.8);
     }
 
+    // tabel skor per ronde untuk layar pemenang
+    function scoreTable(st) {
+      const rows = [];
+      for (let r = 0; r < st.round; r++) {
+        const cp = st.points.chung[r];
+        const hp = st.points.hong[r];
+        const rw = st.roundWinner[r];
+        if (!rw && cp + hp === 0) continue; // ronde yang tidak dimainkan
+        rows.push(
+          `<tr><td class="rl">R${r + 1}</td>` +
+          `<td class="sc chung ${rw === 'chung' ? 'win' : ''}">${cp}</td>` +
+          `<td class="sc hong ${rw === 'hong' ? 'win' : ''}">${hp}</td></tr>`
+        );
+      }
+      if (!rows.length) return '';
+      return `<table class="res-table">` +
+        `<tr><th></th><th>${st.chung.country}</th><th>${st.hong.country}</th></tr>` +
+        rows.join('') + `</table>`;
+    }
+
     function render(st) {
       handleSounds(last, st);
       last = st;
@@ -294,11 +314,26 @@
 
       if (st.phase === 'ended') {
         const w = st[st.winner];
-        ov.className = 'overlay ' + st.winner;
-        ov.innerHTML =
-          `<div class="ov-title">MATCH ${st.matchNo} RESULT</div>` +
-          `<div class="ov-win">WINNER</div>` +
-          `<div class="ov-name">${w.name} (${w.country})</div>`;
+        const rc = st.roundWinner.filter((x) => x === 'chung').length;
+        const rh = st.roundWinner.filter((x) => x === 'hong').length;
+        if (st.resultStage === 'bow') {
+          ov.className = 'overlay';
+          ov.innerHTML =
+            `<div class="ov-title">MATCH ${st.matchNo}</div>` +
+            `<div class="bow">CHA-RYEOT</div>` +
+            `<div class="bow">KYEONG-RYE</div>`;
+        } else {
+          const code = st.resultCode;
+          const cname = (st.meta && st.meta.result && st.meta.result[code]) || '';
+          ov.className = 'overlay ' + st.winner;
+          ov.innerHTML =
+            `<div class="ov-title">MATCH ${st.matchNo} RESULT</div>` +
+            `<div class="ov-win">WINNER</div>` +
+            `<div class="ov-name">${w.name} (${w.country})</div>` +
+            (code ? `<div class="ov-code">${cname} (${code})</div>` : '') +
+            scoreTable(st) +
+            (rc + rh > 0 ? `<div class="ov-rounds">ROUNDS ${rc} – ${rh}</div>` : '');
+        }
       } else if (st.phase === 'roundEnd') {
         const w = st.roundWinner[i];
         const p = st[w];

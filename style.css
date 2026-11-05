@@ -308,3 +308,15 @@ body[data-phase="timeUp"] .timer { background: #c62828; color: #fff; }
 .side.hong .hit  { color: #f0121f; }
 .side .hit.hi { color: #ffd400; filter: drop-shadow(0 0 1vh rgba(255, 212, 0, .95)); }
 .side .hit.t-fist { color: #0f1b33; }
+
+/* ===== Layar pemenang: tabel skor, kode hasil, protokol akhir ===== */
+.res-table { border-collapse: separate; border-spacing: 1vh 0.8vh; }
+.res-table th { font-size: 3vh; opacity: .8; font-weight: 700; }
+.res-table td.rl { font-size: 3.5vh; opacity: .8; padding-right: 1vw; }
+.res-table td.sc { font-size: 6vh; font-weight: 800; text-align: center; min-width: 14vw; padding: .4vh 1vw; border-radius: 1vh; }
+.res-table td.sc.chung { background: #1565c0; }
+.res-table td.sc.hong  { background: #d32f2f; }
+.res-table td.sc.win   { outline: .6vh solid #ffeb00; }
+.bow { font-size: 14vh; font-weight: 800; letter-spacing: .5vw; }
+.ov-code { font-size: 3.6vh; opacity: .9; }
+.ov-rounds { font-size: 4.5vh; font-weight: 700; }
