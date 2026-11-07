@@ -519,8 +519,6 @@ function createWindow(file, opts = {}) {
   });
   win.loadFile(file);
   windows.push(win);
-  // perbaikan bug fokus keyboard Electron di Windows: isi jendela ikut menerima fokus
-  win.on('focus', () => win.webContents.focus());
   win.on('closed', () => windows.splice(windows.indexOf(win), 1));
   return win;
 }
