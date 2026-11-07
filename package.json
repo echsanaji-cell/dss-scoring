@@ -1,17 +1,37 @@
 {
   "name": "dss-taekwondo",
   "version": "1.0.0",
-  "description": "",
+  "description": "Digital Scoring System Taekwondo",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder --win"
   },
   "keywords": [],
-  "author": "",
+  "author": "Ozone",
   "license": "ISC",
   "type": "commonjs",
+  "build": {
+    "appId": "id.dss.taekwondo",
+    "productName": "DSS Taekwondo",
+    "files": [
+      "main.js",
+      "operator.html",
+      "scoreboard.html",
+      "devtest.html",
+      "style.css"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
   "devDependencies": {
-    "electron": "^30.5.1"
+    "electron": "^30.5.1",
+    "electron-builder": "^26.18.0"
   }
 }
