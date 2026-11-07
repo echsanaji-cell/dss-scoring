@@ -491,6 +491,36 @@
       flashT = setTimeout(() => { if (!joyMode) $('joyMsg').textContent = ''; }, 1500);
     }
 
+    // Kombinasi tombol (satu juri, satu atlet, ditekan hampir bersamaan):
+    // Kepala+Pukulan (3+1) = Putar badan 4 | Kepala+Badan (3+2) atau semua tiga = Putar kepala 6
+    const COMBO_MS = 200;
+    const combo = {}; // 'juri:sisi' -> { techs: [], timer }
+
+    function comboResolve(techs) {
+      const has = (t) => techs.includes(t);
+      if (techs.length === 1) return techs[0];
+      if (techs.length === 2 && has('head') && has('punch')) return 'trunk-turn';
+      if (techs.length === 2 && has('head') && has('trunk')) return 'head-turn';
+      if (techs.length === 3) return 'head-turn';
+      return null; // kombinasi lain tidak valid
+    }
+
+    function comboPress(j, side, tech) {
+      const key = j + ':' + side;
+      let c = combo[key];
+      if (!c) {
+        c = combo[key] = { techs: [], timer: null };
+        c.timer = setTimeout(() => {
+          delete combo[key];
+          const t = comboResolve(c.techs);
+          if (!t) return joyFlash(`${judgeLabel(j)}: kombinasi tidak valid`);
+          send('judge', { judge: j, side, tech: t });
+          joyFlash(`${judgeLabel(j)}: ${side.toUpperCase()} ${TECH_NAME[t]}`);
+        }, COMBO_MS);
+      }
+      if (!c.techs.includes(tech)) c.techs.push(tech);
+    }
+
     function onPress(pad, bi) {
       if (joyMode && joyMode.type === 'reg') {
         if (pad in judgeOf) return; // joystick ini sudah terdaftar
@@ -513,8 +543,7 @@
       const act = btnMap[bi];
       if (j === undefined || !act) return;
       const [side, tech] = act.split(':');
-      send('judge', { judge: j, side, tech });
-      joyFlash(`${judgeLabel(j)}: ${side.toUpperCase()} ${TECH_NAME[tech]}`);
+      comboPress(j, side, tech);
     }
 
     function pollPads() {
