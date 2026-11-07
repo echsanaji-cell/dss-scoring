@@ -121,6 +121,19 @@
     Pintasan: Spasi = Shijak/Kal-yeo · Chung: Q W E R T = +1 +2 +3 +4 +6 · Hong: Y U I O P = +1 +2 +3 +4 +6 · G / H = Gam-jeom Chung / Hong · Z = Undo
   </div>
 
+  <!-- Hasil khusus + Record Paper -->
+  <div class="op-controls">
+    <select id="resCode">
+      <option value="RSC">RSC (wasit hentikan)</option>
+      <option value="WDR">WDR (mengundurkan diri)</option>
+      <option value="DSQ">DSQ (diskualifikasi)</option>
+    </select>
+    <button class="b-chung" id="btnResChung">CHUNG MENANG</button>
+    <button class="b-hong" id="btnResHong">HONG MENANG</button>
+    <button id="btnResCancel">↩ Batalkan hasil</button>
+    <button class="b-ref" id="btnRecord">📄 Record Paper (PDF)</button>
+  </div>
+
   <!-- Koreksi waktu -->
   <div class="op-time">
     <span>Koreksi waktu (saat Kal-yeo):</span>
@@ -229,7 +242,7 @@
       const rows = st.events.slice().reverse().slice(0, 40).map((e) => {
         let txt = '';
         if (e.kind === 'score') txt = `${SIDE[e.side]}: ${TECH_NAME[e.tech]} +${e.pts}`;
-        else if (e.kind === 'gj') txt = `${SIDE[e.side]} kena Gam-jeom (${gjName(e.reason)}), lawan +${e.pts}`;
+        else if (e.kind === 'gj') txt = `${SIDE[e.side]} kena Gam-jeom${e.passive ? ' (pasif)' : ''}, lawan +${e.pts}`;
         else if (e.kind === 'ivr') {
           txt = `${IVR_NAME[e.ivrKind]}${e.by ? ' ' + SIDE[e.by] : ''}: ${e.result === 'accept' ? 'ACCEPT' : 'REJECT'}${e.reason ? ' · ' + e.reason : ''}`;
         }
@@ -612,6 +625,102 @@
     setInterval(pollPads, 15);
     setInterval(joyShow, 500);
     joyShow();
+
+    // ===== HASIL KHUSUS + RECORD PAPER =====
+    const RESULT_NAME = {
+      PTF: 'Menang angka (Win by Final Score)',
+      RSC: 'Wasit menghentikan pertandingan (Referee Stop Contest)',
+      WDR: 'Mengundurkan diri (Withdrawal)',
+      DSQ: 'Diskualifikasi (Disqualification)',
+    };
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    function eventText(e) {
+      if (e.kind === 'score') return `${SIDE[e.side]}: ${TECH_NAME[e.tech]} +${e.pts}`;
+      if (e.kind === 'gj') return `${SIDE[e.side]} kena Gam-jeom${e.passive ? ' (pasif)' : ''}, lawan +${e.pts}`;
+      return `${IVR_NAME[e.ivrKind]}${e.by ? ' ' + SIDE[e.by] : ''}: ${e.result === 'accept' ? 'ACCEPT' : 'REJECT'}${e.reason ? ' · ' + e.reason : ''}`;
+    }
+
+    function buildRecordHTML(st) {
+      const w = st.winner ? st[st.winner] : null;
+      const rc = st.roundWinner.filter((x) => x === 'chung').length;
+      const rh = st.roundWinner.filter((x) => x === 'hong').length;
+      const rows = [0, 1, 2].map((r) => {
+        const on = r < st.round;
+        const rw = st.roundWinner[r];
+        return `<tr><td>Ronde ${r + 1}</td><td>${on ? st.points.chung[r] : '-'}</td><td>${on ? st.gamjeom.chung[r] : '-'}</td>` +
+          `<td>${on ? st.points.hong[r] : '-'}</td><td>${on ? st.gamjeom.hong[r] : '-'}</td><td>${rw ? SIDE[rw] : '-'}</td></tr>`;
+      }).join('');
+      const evs = st.events.map((e) =>
+        `<tr><td>R${e.round}</td><td>${fmt(e.t)}</td><td class="l">${esc(eventText(e))}${e.note ? ' <i>(' + esc(e.note) + ')</i>' : ''}</td></tr>`
+      ).join('') || '<tr><td colspan="3">Tidak ada kejadian</td></tr>';
+      const code = st.resultCode;
+      return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        body { font-family: Arial, sans-serif; color: #000; font-size: 12px; }
+        h1 { font-size: 20px; margin: 0 0 4px; }
+        h2 { font-size: 14px; margin: 16px 0 6px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #444; padding: 4px 6px; text-align: center; }
+        td.l, th.l { text-align: left; }
+        .blue { color: #0b3fa8; } .red { color: #b00020; }
+        .res { font-size: 15px; font-weight: 700; margin: 8px 0; }
+        .small { color: #555; font-size: 11px; }
+      </style></head><body>
+        <h1>RECORD PAPER</h1>
+        <div>Kategori: <b>${esc(st.category)}</b> &nbsp;·&nbsp; Match No: <b>${esc(st.matchNo)}</b></div>
+        <div class="small">Dicetak: ${esc(new Date().toLocaleString('id-ID'))}</div>
+        <h2>Atlet</h2>
+        <table>
+          <tr><th class="l">Sisi</th><th class="l">Nama</th><th>Negara</th><th>Ronde menang</th><th>Sisa IVR</th></tr>
+          <tr><td class="l blue"><b>CHUNG (Biru)</b></td><td class="l">${esc(st.chung.name)}</td><td>${esc(st.chung.country)}</td><td>${rc}</td><td>${st.ivr.chung}</td></tr>
+          <tr><td class="l red"><b>HONG (Merah)</b></td><td class="l">${esc(st.hong.name)}</td><td>${esc(st.hong.country)}</td><td>${rh}</td><td>${st.ivr.hong}</td></tr>
+        </table>
+        <div class="res">Pemenang: ${w ? esc(w.name) + ' (' + esc(w.country) + ') – ' + SIDE[st.winner] : '-'}${code ? '<br>Hasil: ' + code + ' – ' + esc(RESULT_NAME[code] || '') : ''}</div>
+        <h2>Skor per ronde</h2>
+        <table>
+          <tr><th>Ronde</th><th>Chung</th><th>GJ</th><th>Hong</th><th>GJ</th><th>Pemenang ronde</th></tr>
+          ${rows}
+        </table>
+        <h2>Log kejadian</h2>
+        <table>
+          <tr><th>Ronde</th><th>Sisa waktu</th><th class="l">Kejadian</th></tr>
+          ${evs}
+        </table>
+      </body></html>`;
+    }
+
+    // tombol butuh dua klik dalam 3 detik (tanpa dialog bawaan)
+    function twoClick(btn, fn) {
+      const orig = btn.textContent;
+      let armed = false;
+      btn.addEventListener('click', () => {
+        if (!armed) {
+          armed = true;
+          btn.textContent = 'Klik lagi untuk memastikan';
+          setTimeout(() => { armed = false; btn.textContent = orig; }, 3000);
+        } else {
+          armed = false;
+          btn.textContent = orig;
+          fn();
+        }
+      });
+    }
+    twoClick($('btnResChung'), () => send('manualResult', { side: 'chung', code: $('resCode').value }));
+    twoClick($('btnResHong'), () => send('manualResult', { side: 'hong', code: $('resCode').value }));
+    $('btnResCancel').onclick = () => send('cancelResult');
+    $('btnRecord').onclick = async () => {
+      if (!last || last.phase !== 'ended') return;
+      const name = 'Record_Match_' + String(last.matchNo).replace(/[^A-Za-z0-9_-]/g, '') + '.pdf';
+      await ipcRenderer.invoke('saveRecord', buildRecordHTML(last), name);
+    };
+    setInterval(() => {
+      if (!last) return;
+      const canRes = !['ended', 'test', 'ivr', 'tie'].includes(last.phase);
+      $('btnResChung').disabled = !canRes;
+      $('btnResHong').disabled = !canRes;
+      $('btnResCancel').disabled = !(last.phase === 'ended' && last.endedBy === 'manual');
+      $('btnRecord').disabled = last.phase !== 'ended';
+    }, 300);
 
     // ===== PINTASAN KEYBOARD =====
     // Chung (biru): Q +1, W +2, E +3, R +4 (putar badan), T +6 (putar kepala)

@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 // ===== PENGATURAN (tersimpan di file, tetap ada setelah aplikasi ditutup) =====
@@ -63,6 +64,14 @@ const META = {
   },
 };
 
+// nama hasil pertandingan (dipakai scoreboard dan Record Paper)
+META.result = {
+  PTF: 'Win by Final Score',
+  RSC: 'Referee Stop Contest',
+  WDR: 'Withdrawal',
+  DSQ: 'Disqualification',
+};
+
 const isPassive = (code) => {
   const r = META.gj.find((x) => x[0] === code);
   return !!(r && r[2]);
@@ -87,7 +96,8 @@ function newMatch() {
     gamjeom: { chung: [0, 0, 0], hong: [0, 0, 0] },  // dihitung dari events
     roundWinner: [null, null, null],
     winner: null,
-    endedBy: null,    // 'round' | 'injury'
+    endedBy: null,    // 'round' | 'injury' | 'manual'
+    resultCode: null, // PTF | RSC | WDR | DSQ
     savedTime: 0,
     settings,
     meta: META,
@@ -157,6 +167,7 @@ function endRound(winner) {
   if (wins(winner) >= 2) {
     state.phase = 'ended';
     state.winner = winner;
+    state.resultCode = 'PTF';
   } else {
     state.phase = 'roundEnd'; // tampilkan pemenang ronde; istirahat dimulai oleh operator
     state.timeLeft = settings.restTime;
@@ -183,6 +194,7 @@ function reopenIfNeeded() {
     state.tie = null;
     state.roundWinner[cur()] = null;
     state.winner = null;
+    state.resultCode = null;
     state.endedBy = null;
     state.timeLeft = state.savedTime;
     state.tenths = state.savedTenths || 0;
@@ -386,9 +398,33 @@ function handle(type, p = {}) {
         state.phase = 'ended';
         state.winner = p.side;
         state.endedBy = 'injury';
+        state.resultCode = 'RSC';
       }
       break;
 
+    case 'manualResult': // p = { side: pemenang, code: 'RSC'|'WDR'|'DSQ' }
+      if (!['ended', 'test', 'ivr', 'tie'].includes(state.phase) &&
+          (p.side === 'chung' || p.side === 'hong') && ['RSC', 'WDR', 'DSQ'].includes(p.code)) {
+        state.manualFrom = state.phase === 'running' ? 'paused' : state.phase;
+        state.savedTime = state.timeLeft;
+        state.savedTenths = state.tenths;
+        state.tenths = 0;
+        state.phase = 'ended';
+        state.winner = p.side;
+        state.endedBy = 'manual';
+        state.resultCode = p.code;
+      }
+      break;
+    case 'cancelResult': // batalkan hasil manual (salah tekan)
+      if (state.phase === 'ended' && state.endedBy === 'manual') {
+        state.phase = state.manualFrom || 'paused';
+        state.timeLeft = state.savedTime;
+        state.tenths = state.savedTenths || 0;
+        state.winner = null;
+        state.endedBy = null;
+        state.resultCode = null;
+      }
+      break;
     case 'ivr': // p = { kind: 'coach'|'referee'|'technical', side? }
       if (scoring) {
         if (p.kind === 'coach') {
@@ -532,6 +568,26 @@ ipcMain.on('cmd', (e, type, payload) => handle(type, payload));
 ipcMain.on('openDevTest', () => {
   createWindow('devtest.html', { width: 900, height: 700, backgroundColor: '#1b1b1b' });
 });
+// Record Paper: HTML dari operator dijadikan PDF, lalu disimpan lewat dialog
+ipcMain.handle('saveRecord', async (e, html, name) => {
+  const tmp = path.join(os.tmpdir(), 'dss-record.html');
+  fs.writeFileSync(tmp, html, 'utf8');
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const win = new BrowserWindow({ show: false });
+  try {
+    await win.loadFile(tmp);
+    const pdf = await win.webContents.printToPDF({ pageSize: 'A4', printBackground: true });
+    const r = await dialog.showSaveDialog(parent, { defaultPath: name, filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+    if (r.canceled || !r.filePath) return null;
+    fs.writeFileSync(r.filePath, pdf);
+    shell.showItemInFolder(r.filePath);
+    return r.filePath;
+  } finally {
+    win.destroy();
+    if (parent) parent.focus();
+  }
+});
+
 ipcMain.on('fullscreen', (e) => {
   const w = BrowserWindow.fromWebContents(e.sender);
   w.setFullScreen(!w.isFullScreen());
