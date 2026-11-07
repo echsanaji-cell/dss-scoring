@@ -406,7 +406,18 @@
     $('btnResume').onclick = () => send('resume');
     $('btnIvrRef').onclick = () => send('ivr', { kind: 'referee' });
     $('btnTech').onclick = () => send('ivr', { kind: 'technical' });
-    $('btnNew').onclick = () => { if (confirm('Mulai pertandingan baru? Skor sekarang akan dihapus.')) send('newMatch'); };
+    let newArmed = false;
+    $('btnNew').onclick = () => {
+      if (!newArmed) {
+        newArmed = true;
+        $('btnNew').textContent = 'Klik lagi: hapus skor?';
+        setTimeout(() => { newArmed = false; $('btnNew').textContent = 'Match Baru'; }, 3000);
+      } else {
+        newArmed = false;
+        $('btnNew').textContent = 'Match Baru';
+        send('newMatch');
+      }
+    };
     $('btnSet').onclick = () => $('settings').classList.toggle('hidden');
     $('btnSetTime').onclick = () => send('setTime', {
       seconds: (Number($('tMin').value) || 0) * 60 + (Number($('tSec').value) || 0),
@@ -611,7 +622,9 @@
       y: ['hong', 'punch'], u: ['hong', 'trunk'], i: ['hong', 'head'], o: ['hong', 'trunk-turn'], p: ['hong', 'head-turn'],
     };
     document.addEventListener('keydown', (e) => {
-      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      const ae = document.activeElement;
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) ||
+          (ae && ['INPUT', 'SELECT', 'TEXTAREA'].includes(ae.tagName))) return;
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
       let handled = true;
