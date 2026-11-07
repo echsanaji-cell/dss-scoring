@@ -4,60 +4,271 @@
 <meta charset="UTF-8">
 <title>Tes Perangkat</title>
 <style>
-  body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; background: #1b1b1b; color: #fff; margin: 0; padding: 16px; }
-  h1 { font-size: 20px; margin: 0 0 8px; }
-  .hint { opacity: .75; margin-bottom: 14px; }
-  .pad { background: #262626; border-radius: 10px; padding: 12px; margin-bottom: 12px; }
-  .pad h2 { font-size: 16px; margin: 0 0 4px; }
+  :root { --blue: #1e6fe0; --red: #e53935; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #000; color: #fff; font-family: -apple-system, 'Segoe UI', Arial, sans-serif; }
+  #stage { max-width: 1100px; margin: 0 auto; padding: 10px 20px 24px; }
+  .top { position: relative; text-align: center; }
+  h1 { font-size: 46px; letter-spacing: 1px; margin: 6px 0 4px; }
+  #reset { position: absolute; right: 0; top: 12px; background: #333; color: #fff; border: 0; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+  #banner { background: #8a4b00; padding: 8px 12px; border-radius: 6px; text-align: center; margin: 6px 0; display: none; }
+  #last { text-align: center; height: 26px; font-size: 18px; color: #ffd600; font-weight: 700; }
+  .legend { text-align: center; font-size: 12px; opacity: .6; margin-bottom: 6px; }
+
+  .board { display: grid; grid-template-columns: 1fr 300px 1fr; align-items: center; gap: 10px; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; align-items: center; justify-content: center; gap: 22px; height: 140px; }
+  .col.chung .ico { color: var(--blue); }
+  .col.hong .ico { color: var(--red); }
+  .cnt { min-width: 120px; text-align: center; }
+  .num { font-size: 68px; font-weight: 800; line-height: 1; }
+  .sub { font-size: 13px; color: #ffd600; height: 16px; margin-top: 2px; }
+
+  .ico { position: relative; width: 120px; height: 120px; }
+  .ico svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .ico.hit svg { animation: hit .25s ease-out; }
+  @keyframes hit { 0% { transform: scale(1.18); filter: brightness(1.6); } 100% { transform: scale(1); filter: none; } }
+  .ring { position: absolute; inset: -14px; border-radius: 50%; border: 5px dashed #ffd600; opacity: 0; pointer-events: none; }
+  .ring.r6 { border-color: #ff6d00; }
+  .ico.fx .ring { animation: spin 1s linear, fade 1s ease-out forwards; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fade { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+  .pop { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); font-size: 40px; font-weight: 900;
+         color: #ffd600; text-shadow: 0 0 12px #ffd600; opacity: 0; pointer-events: none; }
+  .pop.r6 { color: #ff6d00; text-shadow: 0 0 12px #ff6d00; }
+  .ico.fx .pop { animation: pop 1s ease-out; }
+  @keyframes pop {
+    0% { opacity: 1; transform: translate(-50%, 10px) scale(.6); }
+    30% { opacity: 1; transform: translate(-50%, -14px) scale(1.2); }
+    100% { opacity: 0; transform: translate(-50%, -40px) scale(1); }
+  }
+
+  .mid { display: flex; flex-direction: column; gap: 10px; }
+  .jbox { height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .jbox.off { opacity: .35; }
+  .jbox svg { width: 100%; }
+  .jlab { font-size: 12px; opacity: .7; margin-top: 2px; }
+  .dot { fill: #777; }
+  .dot.on[data-side="chung"] { fill: var(--blue); filter: drop-shadow(0 0 6px var(--blue)); }
+  .dot.on[data-side="hong"] { fill: var(--red); filter: drop-shadow(0 0 6px var(--red)); }
+
+  details { margin-top: 18px; background: #151515; border-radius: 8px; padding: 10px 14px; }
+  summary { cursor: pointer; font-weight: 700; }
+  .pad { background: #262626; border-radius: 10px; padding: 12px; margin: 10px 0; }
+  .pad h2 { font-size: 15px; margin: 0 0 4px; }
   .id { font-size: 12px; opacity: .7; word-break: break-all; margin-bottom: 8px; }
   .btns { display: flex; flex-wrap: wrap; gap: 6px; }
-  .b { width: 44px; height: 44px; border-radius: 8px; background: #3a3a3a; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .b { width: 40px; height: 40px; border-radius: 8px; background: #3a3a3a; display: flex; align-items: center; justify-content: center; font-weight: 700; }
   .b.on { background: #ffd600; color: #000; }
   .axes { margin-top: 8px; font-size: 13px; opacity: .85; }
-  #log { background: #111; border-radius: 8px; padding: 10px; height: 200px; overflow: auto; font-family: Menlo, monospace; font-size: 13px; }
+  #log { background: #111; border-radius: 8px; padding: 10px; height: 160px; overflow: auto; font-family: Menlo, Consolas, monospace; font-size: 13px; }
 </style>
 </head>
 <body>
-  <h1>🎮 Tes Perangkat (joystick)</h1>
-  <div class="hint">Tekan tombol di joystick agar perangkat terdeteksi. Tiap perangkat tampil terpisah dengan nomor indeks.</div>
-  <div id="pads"></div>
-  <div id="empty" class="pad">Belum ada perangkat terbaca. Tekan sebuah tombol di joystick...</div>
-  <h2 style="font-size:16px">Log tombol</h2>
-  <div id="log"></div>
+  <!-- ikon: satu bentuk untuk kedua sisi, warna dari CSS (currentColor) -->
+  <svg width="0" height="0" style="position:absolute">
+    <symbol id="ico-head" viewBox="0 0 100 110">
+      <path fill="currentColor" fill-rule="evenodd" d="M50 4C24 4 8 22 8 48V76C8 92 22 106 40 106H60C78 106 92 92 92 76V48C92 22 76 4 50 4ZM30 54H70V72C70 84 61 92 50 92C39 92 30 84 30 72Z"/>
+      <path d="M22 34C28 18 40 12 52 12" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="5" stroke-linecap="round"/>
+      <path d="M44 26L56 38M56 26L44 38" stroke="#fff" stroke-opacity=".85" stroke-width="4" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="ico-body" viewBox="0 0 120 110">
+      <path fill="currentColor" d="M34 6H50C52 20 68 20 70 6H86L114 22L106 56L100 100C100 104 96 106 92 106H28C24 106 20 104 20 100L14 56L6 22Z"/>
+      <path fill="#d9d9d9" d="M34 6H50C52 20 68 20 70 6H86L114 22L110 40H10L6 22Z"/>
+      <path d="M60 44V104M36 60L38 100M84 60L82 100" stroke="#fff" stroke-opacity=".25" stroke-width="2" fill="none"/>
+    </symbol>
+    <symbol id="ico-fist" viewBox="0 0 100 100">
+      <rect x="20" y="40" width="62" height="50" rx="16" fill="currentColor"/>
+      <rect x="20" y="16" width="15" height="40" rx="7.5" fill="currentColor"/>
+      <rect x="37" y="10" width="15" height="46" rx="7.5" fill="currentColor"/>
+      <rect x="54" y="10" width="15" height="46" rx="7.5" fill="currentColor"/>
+      <rect x="71" y="16" width="14" height="40" rx="7" fill="currentColor"/>
+      <path d="M22 58C10 54 6 66 14 76C20 82 26 80 28 76Z" fill="currentColor"/>
+      <path d="M36 16V50M53 10V50M70 10V50" stroke="#000" stroke-opacity=".35" stroke-width="2"/>
+    </symbol>
+  </svg>
+
+  <div id="stage">
+    <div class="top">
+      <h1>TEST MODE</h1>
+      <button id="reset">Reset hitungan</button>
+    </div>
+    <div id="banner">Pemetaan tombol belum ada. Di jendela operator, klik 🎚 Atur Tombol sampai selesai (6 tombol).</div>
+    <div id="last"></div>
+    <div class="legend">Titik menyala = tombol ditekan (atas ke bawah: kepala, badan, pukulan) · Kepala+Pukulan = putar badan +4 · Badan+Kepala = putar kepala +6</div>
+
+    <div class="board">
+      <div class="col chung" id="colChung"></div>
+      <div class="mid" id="mid"></div>
+      <div class="col hong" id="colHong"></div>
+    </div>
+
+    <details id="detail">
+      <summary>Detail perangkat (diagnosa)</summary>
+      <div id="pads"></div>
+      <div id="empty" class="pad">Belum ada perangkat terbaca. Tekan sebuah tombol di joystick...</div>
+      <div id="log"></div>
+    </details>
+  </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const prev = {}; // status tombol sebelumnya per indeks gamepad
-    const log = (t) => {
-      const d = $('log');
-      d.innerHTML = `${new Date().toLocaleTimeString()}  ${t}<br>` + d.innerHTML;
+    const KINDS = ['head', 'trunk', 'punch']; // urutan atas ke bawah
+    const ICON = { head: 'ico-head', trunk: 'ico-body', punch: 'ico-fist' };
+    const TECH_LABEL = { punch: 'Pukulan +1', trunk: 'Badan +2', head: 'Kepala +3', 'trunk-turn': 'Putar badan +4', 'head-turn': 'Putar kepala +6' };
+    const SIDE_NAME = { chung: 'CHUNG', hong: 'HONG' };
+    const COMBO_MS = 200;
+
+    let btnMap = {};
+    const count = {};
+    const fresh = () => ({ head: 0, trunk: 0, punch: 0, t4: 0, t6: 0 });
+    count.chung = fresh(); count.hong = fresh();
+
+    // ----- bangun tampilan -----
+    function rowHTML(side, kind) {
+      const cnt = `<div class="cnt"><div class="num" id="n-${side}-${kind}">0</div><div class="sub" id="s-${side}-${kind}"></div></div>`;
+      const ico = `<div class="ico" id="i-${side}-${kind}"><svg><use href="#${ICON[kind]}" width="100%" height="100%"/></svg><div class="ring"></div><div class="pop"></div></div>`;
+      return `<div class="row">${side === 'chung' ? cnt + ico : ico + cnt}</div>`;
+    }
+    $('colChung').innerHTML = KINDS.map((k) => rowHTML('chung', k)).join('');
+    $('colHong').innerHTML = KINDS.map((k) => rowHTML('hong', k)).join('');
+
+    function judgeHTML(n) {
+      const L = [[14, 12], [30, 38], [46, 62]];
+      const R = [[206, 12], [190, 38], [174, 62]];
+      const dots = (pts, side) => pts.map(([x, y], i) =>
+        `<circle class="dot" id="d${n}-${side}-${KINDS[i]}" data-side="${side}" cx="${x}" cy="${y}" r="9"/>`).join('');
+      return `<div class="jbox off" id="j${n}">
+        <svg viewBox="0 0 220 80">
+          ${dots(L, 'chung')}${dots(R, 'hong')}
+          <rect x="72" y="14" width="76" height="50" rx="9" fill="#777"/>
+          <circle cx="92" cy="30" r="4" fill="#bbb"/><circle cx="128" cy="30" r="4" fill="#bbb"/>
+          <circle cx="92" cy="50" r="4" fill="#bbb"/><circle cx="128" cy="50" r="4" fill="#bbb"/>
+          <path d="M104 34L116 46M116 34L104 46" stroke="#ddd" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <div class="jlab" id="jl${n}">Juri ${n + 1} · tidak terdeteksi</div>
+      </div>`;
+    }
+    $('mid').innerHTML = [0, 1, 2].map(judgeHTML).join('');
+
+    // ----- pemetaan tombol (disimpan oleh jendela operator) -----
+    function loadMap() {
+      try { btnMap = JSON.parse(localStorage.getItem('dss.btnMap') || '{}'); } catch (e) { btnMap = {}; }
+      $('banner').style.display = Object.keys(btnMap).length ? 'none' : 'block';
+    }
+    loadMap();
+    setInterval(loadMap, 500);
+
+    // ----- log -----
+    const log = (t) => { $('log').innerHTML = `${new Date().toLocaleTimeString()}  ${t}<br>` + $('log').innerHTML; };
+    let lastT;
+    function say(t) { $('last').textContent = t; clearTimeout(lastT); lastT = setTimeout(() => { $('last').textContent = ''; }, 2500); }
+
+    // ----- efek -----
+    function retrigger(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+    function fx(el, turn) {
+      const ring = el.querySelector('.ring'), pop = el.querySelector('.pop');
+      ring.className = 'ring r' + turn;
+      pop.className = 'pop r' + turn;
+      pop.textContent = '+' + turn;
+      retrigger(el, 'fx');
+    }
+
+    // ----- hasil kombinasi (aturan sama dengan operator) -----
+    function comboResolve(techs) {
+      const has = (t) => techs.includes(t);
+      if (techs.length === 1) return techs[0];
+      if (techs.length === 2 && has('head') && has('punch')) return 'trunk-turn';
+      if (techs.length === 2 && has('head') && has('trunk')) return 'head-turn';
+      if (techs.length === 3) return 'head-turn';
+      return null;
+    }
+    const combo = {};
+    function comboPress(pad, side, tech) {
+      const key = pad + ':' + side;
+      let c = combo[key];
+      if (!c) {
+        c = combo[key] = { techs: [], timer: null };
+        c.timer = setTimeout(() => {
+          delete combo[key];
+          const t = comboResolve(c.techs);
+          if (!t) return say('Kombinasi tidak valid');
+          apply(pad, side, t);
+        }, COMBO_MS);
+      }
+      if (!c.techs.includes(tech)) c.techs.push(tech);
+    }
+
+    function apply(pad, side, tech) {
+      const kind = tech.startsWith('head') ? 'head' : tech.startsWith('trunk') ? 'trunk' : 'punch';
+      const c = count[side];
+      c[kind]++;
+      if (tech === 'trunk-turn') c.t4++;
+      if (tech === 'head-turn') c.t6++;
+      $(`n-${side}-${kind}`).textContent = c[kind];
+      if (kind === 'trunk') $(`s-${side}-trunk`).textContent = c.t4 ? `putar +4 × ${c.t4}` : '';
+      if (kind === 'head') $(`s-${side}-head`).textContent = c.t6 ? `putar +6 × ${c.t6}` : '';
+      const el = $(`i-${side}-${kind}`);
+      retrigger(el, 'hit');
+      if (tech === 'trunk-turn') fx(el, 4);
+      if (tech === 'head-turn') fx(el, 6);
+      say(`${SIDE_NAME[side]} · ${TECH_LABEL[tech]} (indeks ${pad})`);
+    }
+
+    $('reset').onclick = () => {
+      count.chung = fresh(); count.hong = fresh();
+      for (const side of ['chung', 'hong']) for (const k of KINDS) {
+        $(`n-${side}-${k}`).textContent = '0';
+        $(`s-${side}-${k}`).textContent = '';
+      }
+      $('last').textContent = '';
     };
 
-    function loop() {
-      const pads = (navigator.getGamepads ? Array.from(navigator.getGamepads()) : []).filter(Boolean);
-      $('empty').style.display = pads.length ? 'none' : '';
-      $('pads').innerHTML = pads.map((p) => `
-        <div class="pad">
-          <h2>Indeks ${p.index}</h2>
-          <div class="id">${p.id} · mapping: ${p.mapping || '-'} · ${p.buttons.length} tombol · ${p.axes.length} sumbu · connected: ${p.connected} · ts: ${Math.round(p.timestamp)}</div>
-          <div class="btns">${p.buttons.map((b, i) => `<div class="b ${b.pressed ? 'on' : ''}">${i}</div>`).join('')}</div>
-          <div class="axes">Sumbu: ${p.axes.map((a) => a.toFixed(2)).join(' | ')}</div>
-        </div>`).join('');
+    // ----- baca joystick -----
+    const prev = {};
+    function frame() {
+      const pads = (navigator.getGamepads ? Array.from(navigator.getGamepads()) : []).filter(Boolean)
+        .sort((a, b) => a.index - b.index);
+
+      for (let n = 0; n < 3; n++) {
+        const p = pads[n];
+        $('j' + n).classList.toggle('off', !p);
+        $('jl' + n).textContent = p ? `Juri ${n + 1} · indeks ${p.index}` : `Juri ${n + 1} · tidak terdeteksi`;
+        const lit = new Set();
+        if (p) p.buttons.forEach((b, bi) => { if (b.pressed && btnMap[bi]) lit.add(btnMap[bi]); });
+        for (const side of ['chung', 'hong']) {
+          for (const k of KINDS) $(`d${n}-${side}-${k}`).classList.toggle('on', lit.has(side + ':' + k));
+        }
+      }
 
       for (const p of pads) {
         const was = prev[p.index] || [];
-        p.buttons.forEach((b, i) => {
-          if (b.pressed && !was[i]) log(`Indeks ${p.index}: tombol ${i} DITEKAN`);
-          if (!b.pressed && was[i]) log(`Indeks ${p.index}: tombol ${i} dilepas`);
+        p.buttons.forEach((b, bi) => {
+          if (b.pressed && !was[bi]) {
+            const act = btnMap[bi];
+            log(`Indeks ${p.index}: tombol ${bi}${act ? ' → ' + act : ' (belum dipetakan)'}`);
+            if (act) { const [side, tech] = act.split(':'); comboPress(p.index, side, tech); }
+          }
         });
         prev[p.index] = p.buttons.map((b) => b.pressed);
       }
-      requestAnimationFrame(loop);
-    }
 
+      // detail perangkat (hanya digambar saat bagian ini dibuka)
+      if ($('detail').open) {
+        $('empty').style.display = pads.length ? 'none' : '';
+        $('pads').innerHTML = pads.map((p) => `
+          <div class="pad">
+            <h2>Indeks ${p.index}</h2>
+            <div class="id">${p.id} · mapping: ${p.mapping || '-'} · ${p.buttons.length} tombol · ${p.axes.length} sumbu</div>
+            <div class="btns">${p.buttons.map((b, i) => `<div class="b ${b.pressed ? 'on' : ''}">${i}</div>`).join('')}</div>
+            <div class="axes">Sumbu: ${p.axes.map((a) => a.toFixed(2)).join(' | ')}</div>
+          </div>`).join('');
+      }
+      requestAnimationFrame(frame);
+    }
     window.addEventListener('gamepadconnected', (e) => log(`Terhubung: indeks ${e.gamepad.index} (${e.gamepad.id})`));
     window.addEventListener('gamepaddisconnected', (e) => log(`Terputus: indeks ${e.gamepad.index}`));
-    loop();
+    frame();
   </script>
 </body>
 </html>

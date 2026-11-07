@@ -566,7 +566,7 @@ function broadcast() {
 ipcMain.handle('getState', () => state);
 ipcMain.on('cmd', (e, type, payload) => handle(type, payload));
 ipcMain.on('openDevTest', () => {
-  createWindow('devtest.html', { width: 900, height: 700, backgroundColor: '#1b1b1b' });
+  createWindow('devtest.html', { width: 1100, height: 780, backgroundColor: '#000000' });
 });
 // Record Paper: HTML dari operator dijadikan PDF, lalu disimpan lewat dialog
 ipcMain.handle('saveRecord', async (e, html, name) => {
