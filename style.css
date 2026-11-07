@@ -328,3 +328,19 @@ body[data-phase="timeUp"] .timer { background: #c62828; color: #fff; }
 
 .joy-warn { color: #fff; background: #c62828; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
 .joy-warn:empty { display: none; }
+
+/* ===== MENU DROPDOWN OPERATOR ===== */
+.menubar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.dd { position: relative; }
+.dd > button { background: #37474f !important; }
+.dd > button.open { background: #546e7a !important; }
+.menu-panel {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 50; min-width: 340px;
+  background: #262626; border: 1px solid #444; border-radius: 10px; padding: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5); display: flex; flex-direction: column; gap: 10px;
+}
+.menu-panel.hidden { display: none; }
+.menu-panel h4 { margin: 4px 0 0; font-size: 12px; letter-spacing: 1px; opacity: .6; text-transform: uppercase; }
+.menu-panel .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.menu-panel .op-settings { margin: 0; padding: 0; background: transparent; flex-direction: column; align-items: flex-start; gap: 10px; }
+.menu-panel #joyStat { font-size: 13px; line-height: 1.6; }

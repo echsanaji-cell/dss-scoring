@@ -7,6 +7,77 @@
 </head>
 <body class="operator" data-phase="waiting">
 
+  <!-- Menu: joystick, hasil, pengaturan (kontrol pertandingan ada di bawah, di luar menu) -->
+  <div class="menubar">
+    <div class="dd">
+      <button id="menuJoy">🎮 Joystick ▾</button>
+      <div class="menu-panel hidden">
+        <h4>Joystick juri</h4>
+        <div class="row">
+          <button class="b-joy" id="btnJoyReg">🎮 Daftar Juri</button>
+          <button class="b-joy" id="btnJoyMap">🎚 Atur Tombol</button>
+          <button class="b-joy" id="btnJoyChk">📣 Cek Juri</button>
+        </div>
+        <div id="joyStat"></div>
+        <h4>Diagnosa</h4>
+        <div class="row">
+          <button class="b-dev" id="btnDev">🎮 Tes Perangkat</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dd">
+      <button id="menuRes">🏁 Hasil ▾</button>
+      <div class="menu-panel hidden">
+        <h4>Hasil khusus</h4>
+        <div class="row">
+          <select id="resCode">
+            <option value="RSC">RSC (wasit hentikan)</option>
+            <option value="WDR">WDR (mengundurkan diri)</option>
+            <option value="DSQ">DSQ (diskualifikasi)</option>
+          </select>
+        </div>
+        <div class="row">
+          <button class="b-chung" id="btnResChung">CHUNG MENANG</button>
+          <button class="b-hong" id="btnResHong">HONG MENANG</button>
+          <button id="btnResCancel">↩ Batalkan hasil</button>
+        </div>
+        <h4>Laporan</h4>
+        <div class="row">
+          <button class="b-ref" id="btnRecord">📄 Record Paper (PDF)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dd">
+      <button id="menuSet">⚙ Pengaturan ▾</button>
+      <div class="menu-panel hidden">
+        <h4>Pengaturan pertandingan</h4>
+        <div class="op-settings" id="settings">
+          <label>Waktu ronde (detik) <input id="sRound" type="number" min="10"></label>
+          <label>Istirahat (detik) <input id="sRest" type="number" min="0"></label>
+          <label>Batas Gam-jeom / ronde <input id="sGj" type="number" min="1"></label>
+          <label><input id="sGapOn" type="checkbox"> Point gap aktif</label>
+          <label>Selisih point gap <input id="sGap" type="number" min="1"></label>
+          <label>Kuota IVR / pertandingan <input id="sIvr" type="number" min="0"></label>
+          <label>Jumlah juri
+            <select id="sJudge"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+          </label>
+        </div>
+        <h4>Pintasan keyboard</h4>
+        <div class="muted" style="font-size:12px;line-height:1.6">
+          Spasi = Shijak / Kal-yeo<br>
+          Chung: Q W E R T = +1 +2 +3 +4 +6<br>
+          Hong: Y U I O P = +1 +2 +3 +4 +6<br>
+          G / H = Gam-jeom Chung / Hong · Z = Undo
+        </div>
+      </div>
+    </div>
+
+    <span class="joy-msg" id="joyMsg"></span>
+    <span class="joy-warn" id="joyWarn"></span>
+  </div>
+
   <!-- Info pertandingan -->
   <div class="op-top">
     <input id="category" placeholder="Kategori (mis. Male -58 kg)">
@@ -90,17 +161,7 @@
     </div>
   </div>
 
-  <!-- Joystick juri -->
-  <div class="joy">
-    <button class="b-joy" id="btnJoyReg">🎮 Daftar Juri</button>
-    <button class="b-joy" id="btnJoyMap">🎚 Atur Tombol</button>
-    <button class="b-joy" id="btnJoyChk">📣 Cek Juri</button>
-    <span class="joy-msg" id="joyMsg"></span>
-    <span id="joyStat"></span>
-    <span class="joy-warn" id="joyWarn"></span>
-  </div>
-
-  <!-- Kontrol -->
+  <!-- Kontrol pertandingan -->
   <div class="op-controls">
     <button class="b-start" id="btnStart">▶ Shijak / Kye-sok</button>
     <button class="b-pause" id="btnPause">⏸ Kal-yeo</button>
@@ -112,26 +173,7 @@
     <button class="b-ref" id="btnIvrRef">🎥 IVR Wasit</button>
     <button class="b-tech" id="btnTech">🟩 Kartu Teknis</button>
     <button class="b-reopen" id="btnReopen">✎ Buka kembali ronde</button>
-    <button class="b-dev" id="btnDev">🎮 Tes Perangkat</button>
-    <button class="b-set" id="btnSet">⚙ Pengaturan</button>
     <button class="b-new" id="btnNew">Match Baru</button>
-  </div>
-
-  <div class="muted" style="padding:4px 12px;font-size:12px">
-    Pintasan: Spasi = Shijak/Kal-yeo · Chung: Q W E R T = +1 +2 +3 +4 +6 · Hong: Y U I O P = +1 +2 +3 +4 +6 · G / H = Gam-jeom Chung / Hong · Z = Undo
-  </div>
-
-  <!-- Hasil khusus + Record Paper -->
-  <div class="op-controls">
-    <select id="resCode">
-      <option value="RSC">RSC (wasit hentikan)</option>
-      <option value="WDR">WDR (mengundurkan diri)</option>
-      <option value="DSQ">DSQ (diskualifikasi)</option>
-    </select>
-    <button class="b-chung" id="btnResChung">CHUNG MENANG</button>
-    <button class="b-hong" id="btnResHong">HONG MENANG</button>
-    <button id="btnResCancel">↩ Batalkan hasil</button>
-    <button class="b-ref" id="btnRecord">📄 Record Paper (PDF)</button>
   </div>
 
   <!-- Koreksi waktu -->
@@ -140,19 +182,6 @@
     <input id="tMin" type="number" min="0" max="99"> :
     <input id="tSec" type="number" min="0" max="59">
     <button id="btnSetTime">Set waktu</button>
-  </div>
-
-  <!-- Pengaturan -->
-  <div class="op-settings hidden" id="settings">
-    <label>Waktu ronde (detik) <input id="sRound" type="number" min="10"></label>
-    <label>Istirahat (detik) <input id="sRest" type="number" min="0"></label>
-    <label>Batas Gam-jeom / ronde <input id="sGj" type="number" min="1"></label>
-    <label><input id="sGapOn" type="checkbox"> Point gap aktif</label>
-    <label>Selisih point gap <input id="sGap" type="number" min="1"></label>
-    <label>Kuota IVR / pertandingan <input id="sIvr" type="number" min="0"></label>
-    <label>Jumlah juri
-      <select id="sJudge"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
-    </label>
   </div>
 
   <!-- Rekap ronde -->
@@ -431,7 +460,24 @@
         send('newMatch');
       }
     };
-    $('btnSet').onclick = () => $('settings').classList.toggle('hidden');
+    // ===== MENU DROPDOWN =====
+    function closeMenus(exceptPanel) {
+      document.querySelectorAll('.dd').forEach((dd) => {
+        const panel = dd.querySelector('.menu-panel');
+        const btn = dd.querySelector('button');
+        const keep = panel === exceptPanel;
+        panel.classList.toggle('hidden', !keep);
+        btn.classList.toggle('open', keep);
+      });
+    }
+    document.querySelectorAll('.dd').forEach((dd) => {
+      dd.querySelector('button').addEventListener('click', () => {
+        const panel = dd.querySelector('.menu-panel');
+        closeMenus(panel.classList.contains('hidden') ? panel : null);
+      });
+    });
+    document.addEventListener('click', (e) => { if (!e.target.closest('.dd')) closeMenus(null); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenus(null); });
     $('btnSetTime').onclick = () => send('setTime', {
       seconds: (Number($('tMin').value) || 0) * 60 + (Number($('tSec').value) || 0),
     });
