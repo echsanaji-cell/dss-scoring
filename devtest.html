@@ -39,7 +39,7 @@
       $('pads').innerHTML = pads.map((p) => `
         <div class="pad">
           <h2>Indeks ${p.index}</h2>
-          <div class="id">${p.id} · mapping: ${p.mapping || '-'} · ${p.buttons.length} tombol · ${p.axes.length} sumbu</div>
+          <div class="id">${p.id} · mapping: ${p.mapping || '-'} · ${p.buttons.length} tombol · ${p.axes.length} sumbu · connected: ${p.connected} · ts: ${Math.round(p.timestamp)}</div>
           <div class="btns">${p.buttons.map((b, i) => `<div class="b ${b.pressed ? 'on' : ''}">${i}</div>`).join('')}</div>
           <div class="axes">Sumbu: ${p.axes.map((a) => a.toFixed(2)).join(' | ')}</div>
         </div>`).join('');

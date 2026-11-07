@@ -94,6 +94,7 @@
   <div class="joy">
     <button class="b-joy" id="btnJoyReg">🎮 Daftar Juri</button>
     <button class="b-joy" id="btnJoyMap">🎚 Atur Tombol</button>
+    <button class="b-joy" id="btnJoyChk">📣 Cek Juri</button>
     <span class="joy-msg" id="joyMsg"></span>
     <span id="joyStat"></span>
     <span class="joy-warn" id="joyWarn"></span>
@@ -114,6 +115,10 @@
     <button class="b-dev" id="btnDev">🎮 Tes Perangkat</button>
     <button class="b-set" id="btnSet">⚙ Pengaturan</button>
     <button class="b-new" id="btnNew">Match Baru</button>
+  </div>
+
+  <div class="muted" style="padding:4px 12px;font-size:12px">
+    Pintasan: Spasi = Shijak/Kal-yeo · Chung: Q W E R T = +1 +2 +3 +4 +6 · Hong: Y U I O P = +1 +2 +3 +4 +6 · G / H = Gam-jeom Chung / Hong · Z = Undo
   </div>
 
   <!-- Koreksi waktu -->
@@ -465,6 +470,7 @@
     let joyMode = null; // null | { type: 'reg' | 'map', n }
     const prevBtn = {};
     let flashT;
+    let roll = null; // hasil Cek Juri: { until, ok: [nomor juri], done }
 
     const judgeLabel = (j) => 'Juri ' + (j + 1);
     const judgeTotal = () => (last && last.settings.judgeCount) || 1;
@@ -478,14 +484,18 @@
         $('joyMsg').textContent = `Tekan tombol untuk: ${ACTIONS[joyMode.n][2]} (${joyMode.n + 1}/${ACTIONS.length})`;
       }
       const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+      if (roll && !roll.done && Date.now() > roll.until) roll.done = true;
       const problems = [];
       let s = '';
       for (let j = 0; j < judgeTotal(); j++) {
         const idx = Object.keys(judgeOf).find((k) => judgeOf[k] === j);
         let st;
         if (idx === undefined) { st = '✗ belum daftar'; problems.push(`${judgeLabel(j)} belum terdaftar`); }
-        else if (pads[idx] && pads[idx].connected) st = '✓';
-        else { st = '⚠ TERPUTUS'; problems.push(`${judgeLabel(j)} terputus`); }
+        else if (!(pads[idx] && pads[idx].connected)) { st = '⚠ TERPUTUS'; problems.push(`${judgeLabel(j)} terputus`); }
+        else if (roll && roll.ok.includes(j)) st = '✓ merespons';
+        else if (roll && !roll.done) st = '… tekan tombol';
+        else if (roll) { st = '⚠ TIDAK MERESPONS'; problems.push(`${judgeLabel(j)} tidak merespons`); }
+        else st = '✓';
         s += `${judgeLabel(j)}: ${st}   `;
       }
       s += `| Tombol: ${Object.keys(btnMap).length}/${ACTIONS.length}`;
@@ -558,6 +568,10 @@
         return joyShow();
       }
       const j = judgeOf[pad];
+      if (j !== undefined && roll) {
+        if (!roll.ok.includes(j)) roll.ok.push(j);
+        if (!roll.done) return; // saat Cek Juri, tombol tidak dihitung sebagai poin
+      }
       const act = btnMap[bi];
       if (j === undefined || !act) return;
       const [side, tech] = act.split(':');
@@ -574,7 +588,12 @@
       }
     }
 
-    $('btnJoyReg').onclick = () => { judgeOf = {}; joyMode = { type: 'reg', n: 0 }; joyShow(); };
+    $('btnJoyReg').onclick = () => { judgeOf = {}; roll = null; joyMode = { type: 'reg', n: 0 }; joyShow(); };
+    $('btnJoyChk').onclick = () => {
+      if (last && last.phase === 'running') return; // jangan ganggu saat ronde berjalan
+      roll = { until: Date.now() + 6000, ok: [], done: false };
+      joyShow();
+    };
     $('btnJoyMap').onclick = () => { btnMap = {}; joyMode = { type: 'map', n: 0 }; joyShow(); };
     // pendaftaran juri dipertahankan saat terputus; tersambung lagi di indeks yang sama = otomatis aktif
     window.addEventListener('gamepaddisconnected', () => joyShow());
@@ -583,11 +602,29 @@
     setInterval(joyShow, 500);
     joyShow();
 
-    // spasi = start / pause
+    // ===== PINTASAN KEYBOARD =====
+    // Chung (biru): Q +1, W +2, E +3, R +4 (putar badan), T +6 (putar kepala)
+    // Hong (merah): Y +1, U +2, I +3, O +4 (putar badan), P +6 (putar kepala)
+    // G = Gam-jeom Chung, H = Gam-jeom Hong, Z = Undo, Spasi = Shijak / Kal-yeo
+    const KEYS = {
+      q: ['chung', 'punch'], w: ['chung', 'trunk'], e: ['chung', 'head'], r: ['chung', 'trunk-turn'], t: ['chung', 'head-turn'],
+      y: ['hong', 'punch'], u: ['hong', 'trunk'], i: ['hong', 'head'], o: ['hong', 'trunk-turn'], p: ['hong', 'head-turn'],
+    };
     document.addEventListener('keydown', (e) => {
-      if (e.key === ' ' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      let handled = true;
+      if (k === ' ') send(last && last.phase === 'running' ? 'pause' : 'start');
+      else if (KEYS[k]) send('score', { side: KEYS[k][0], tech: KEYS[k][1] });
+      else if (k === 'g') send('gj', { side: 'chung', passive: false });
+      else if (k === 'h') send('gj', { side: 'hong', passive: false });
+      else if (k === 'z') send('undo');
+      else handled = false;
+      if (handled) {
         e.preventDefault();
-        send(last && last.phase === 'running' ? 'pause' : 'start');
+        // lepas fokus tombol supaya Spasi tidak sekaligus "mengklik" tombol yang terakhir diklik
+        if (document.activeElement && document.activeElement.tagName === 'BUTTON') document.activeElement.blur();
       }
     });
   </script>
