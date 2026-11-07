@@ -325,3 +325,6 @@ body[data-phase="timeUp"] .timer { background: #c62828; color: #fff; }
 .b-joy { background: #6a1b9a !important; }
 .joy { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 12px; font-size: 14px; }
 .joy-msg { font-weight: 700; color: #ffd600; }
+
+.joy-warn { color: #fff; background: #c62828; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+.joy-warn:empty { display: none; }

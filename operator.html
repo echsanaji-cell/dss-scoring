@@ -96,6 +96,7 @@
     <button class="b-joy" id="btnJoyMap">🎚 Atur Tombol</button>
     <span class="joy-msg" id="joyMsg"></span>
     <span id="joyStat"></span>
+    <span class="joy-warn" id="joyWarn"></span>
   </div>
 
   <!-- Kontrol -->
@@ -476,13 +477,30 @@
       } else if (joyMode && joyMode.type === 'map') {
         $('joyMsg').textContent = `Tekan tombol untuk: ${ACTIONS[joyMode.n][2]} (${joyMode.n + 1}/${ACTIONS.length})`;
       }
+      const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+      const problems = [];
       let s = '';
       for (let j = 0; j < judgeTotal(); j++) {
         const idx = Object.keys(judgeOf).find((k) => judgeOf[k] === j);
-        s += `${judgeLabel(j)}: ${idx === undefined ? '✗' : '✓ (indeks ' + idx + ')'}   `;
+        let st;
+        if (idx === undefined) { st = '✗ belum daftar'; problems.push(`${judgeLabel(j)} belum terdaftar`); }
+        else if (pads[idx] && pads[idx].connected) st = '✓';
+        else { st = '⚠ TERPUTUS'; problems.push(`${judgeLabel(j)} terputus`); }
+        s += `${judgeLabel(j)}: ${st}   `;
       }
       s += `| Tombol: ${Object.keys(btnMap).length}/${ACTIONS.length}`;
       $('joyStat').textContent = s;
+
+      // peringatan (tidak muncul saat sedang Daftar Juri / Atur Tombol)
+      let warn = '';
+      const nReg = Object.keys(judgeOf).length;
+      if (!joyMode) {
+        if (nReg > 0 && problems.length) warn = '⚠ ' + problems.join(', ');
+        else if (nReg === 0 && last && last.phase === 'running' && pads.some(Boolean)) {
+          warn = '⚠ Joystick terdeteksi tapi belum didaftarkan (klik Daftar Juri)';
+        }
+      }
+      $('joyWarn').textContent = warn;
     }
 
     function joyFlash(t) {
@@ -558,7 +576,9 @@
 
     $('btnJoyReg').onclick = () => { judgeOf = {}; joyMode = { type: 'reg', n: 0 }; joyShow(); };
     $('btnJoyMap').onclick = () => { btnMap = {}; joyMode = { type: 'map', n: 0 }; joyShow(); };
-    window.addEventListener('gamepaddisconnected', (e) => { delete judgeOf[e.gamepad.index]; joyShow(); });
+    // pendaftaran juri dipertahankan saat terputus; tersambung lagi di indeks yang sama = otomatis aktif
+    window.addEventListener('gamepaddisconnected', () => joyShow());
+    window.addEventListener('gamepadconnected', () => joyShow());
     setInterval(pollPads, 15);
     setInterval(joyShow, 500);
     joyShow();
