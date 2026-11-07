@@ -33,5 +33,8 @@
   "devDependencies": {
     "electron": "^30.5.1",
     "electron-builder": "^26.18.0"
+  },
+  "allowScripts": {
+    "electron@30.5.1": true
   }
 }
