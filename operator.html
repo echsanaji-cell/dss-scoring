@@ -102,6 +102,7 @@
     <button class="b-ref" id="btnIvrRef">🎥 IVR Wasit</button>
     <button class="b-tech" id="btnTech">🟩 Kartu Teknis</button>
     <button class="b-reopen" id="btnReopen">✎ Buka kembali ronde</button>
+    <button class="b-dev" id="btnDev">🎮 Tes Perangkat</button>
     <button class="b-set" id="btnSet">⚙ Pengaturan</button>
     <button class="b-new" id="btnNew">Match Baru</button>
   </div>
@@ -383,6 +384,7 @@
     $('btnStart').onclick = () => send('start');
     $('btnPause').onclick = () => send('pause');
     $('btnUndo').onclick = () => send('undo');
+    $('btnDev').onclick = () => ipcRenderer.send('openDevTest');
     $('btnFinish').onclick = () => send('finish');
     $('btnReopen').onclick = () => send('reopen');
     $('btnTest').onclick = () => send('test');

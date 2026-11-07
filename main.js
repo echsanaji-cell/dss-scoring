@@ -499,6 +499,9 @@ function broadcast() {
 
 ipcMain.handle('getState', () => state);
 ipcMain.on('cmd', (e, type, payload) => handle(type, payload));
+ipcMain.on('openDevTest', () => {
+  createWindow('devtest.html', { width: 900, height: 700, backgroundColor: '#1b1b1b' });
+});
 ipcMain.on('fullscreen', (e) => {
   const w = BrowserWindow.fromWebContents(e.sender);
   w.setFullScreen(!w.isFullScreen());

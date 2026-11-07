@@ -320,3 +320,4 @@ body[data-phase="timeUp"] .timer { background: #c62828; color: #fff; }
 .bow { font-size: 14vh; font-weight: 800; letter-spacing: .5vw; }
 .ov-code { font-size: 3.6vh; opacity: .9; }
 .ov-rounds { font-size: 4.5vh; font-weight: 700; }
+.b-dev { background: #00695c !important; }

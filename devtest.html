@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Tes Perangkat</title>
+<style>
+  body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; background: #1b1b1b; color: #fff; margin: 0; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  .hint { opacity: .75; margin-bottom: 14px; }
+  .pad { background: #262626; border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  .pad h2 { font-size: 16px; margin: 0 0 4px; }
+  .id { font-size: 12px; opacity: .7; word-break: break-all; margin-bottom: 8px; }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  .b { width: 44px; height: 44px; border-radius: 8px; background: #3a3a3a; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .b.on { background: #ffd600; color: #000; }
+  .axes { margin-top: 8px; font-size: 13px; opacity: .85; }
+  #log { background: #111; border-radius: 8px; padding: 10px; height: 200px; overflow: auto; font-family: Menlo, monospace; font-size: 13px; }
+</style>
+</head>
+<body>
+  <h1>🎮 Tes Perangkat (joystick)</h1>
+  <div class="hint">Tekan tombol di joystick agar perangkat terdeteksi. Tiap perangkat tampil terpisah dengan nomor indeks.</div>
+  <div id="pads"></div>
+  <div id="empty" class="pad">Belum ada perangkat terbaca. Tekan sebuah tombol di joystick...</div>
+  <h2 style="font-size:16px">Log tombol</h2>
+  <div id="log"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const prev = {}; // status tombol sebelumnya per indeks gamepad
+    const log = (t) => {
+      const d = $('log');
+      d.innerHTML = `${new Date().toLocaleTimeString()}  ${t}<br>` + d.innerHTML;
+    };
+
+    function loop() {
+      const pads = (navigator.getGamepads ? Array.from(navigator.getGamepads()) : []).filter(Boolean);
+      $('empty').style.display = pads.length ? 'none' : '';
+      $('pads').innerHTML = pads.map((p) => `
+        <div class="pad">
+          <h2>Indeks ${p.index}</h2>
+          <div class="id">${p.id} · mapping: ${p.mapping || '-'} · ${p.buttons.length} tombol · ${p.axes.length} sumbu</div>
+          <div class="btns">${p.buttons.map((b, i) => `<div class="b ${b.pressed ? 'on' : ''}">${i}</div>`).join('')}</div>
+          <div class="axes">Sumbu: ${p.axes.map((a) => a.toFixed(2)).join(' | ')}</div>
+        </div>`).join('');
+
+      for (const p of pads) {
+        const was = prev[p.index] || [];
+        p.buttons.forEach((b, i) => {
+          if (b.pressed && !was[i]) log(`Indeks ${p.index}: tombol ${i} DITEKAN`);
+          if (!b.pressed && was[i]) log(`Indeks ${p.index}: tombol ${i} dilepas`);
+        });
+        prev[p.index] = p.buttons.map((b) => b.pressed);
+      }
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('gamepadconnected', (e) => log(`Terhubung: indeks ${e.gamepad.index} (${e.gamepad.id})`));
+    window.addEventListener('gamepaddisconnected', (e) => log(`Terputus: indeks ${e.gamepad.index}`));
+    loop();
+  </script>
+</body>
+</html>
