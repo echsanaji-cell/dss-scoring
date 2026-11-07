@@ -90,6 +90,14 @@
     </div>
   </div>
 
+  <!-- Joystick juri -->
+  <div class="joy">
+    <button class="b-joy" id="btnJoyReg">🎮 Daftar Juri</button>
+    <button class="b-joy" id="btnJoyMap">🎚 Atur Tombol</button>
+    <span class="joy-msg" id="joyMsg"></span>
+    <span id="joyStat"></span>
+  </div>
+
   <!-- Kontrol -->
   <div class="op-controls">
     <button class="b-start" id="btnStart">▶ Shijak / Kye-sok</button>
@@ -444,6 +452,87 @@
         });
       });
     }
+
+    // ===== JOYSTICK JURI =====
+    const ACTIONS = [
+      ['chung', 'punch', 'CHUNG Pukulan (+1)'], ['chung', 'trunk', 'CHUNG Badan (+2)'], ['chung', 'head', 'CHUNG Kepala (+3)'],
+      ['hong', 'punch', 'HONG Pukulan (+1)'], ['hong', 'trunk', 'HONG Badan (+2)'], ['hong', 'head', 'HONG Kepala (+3)'],
+    ];
+    let btnMap = {};   // nomor tombol -> 'side:tech' (tersimpan di localStorage)
+    try { btnMap = JSON.parse(localStorage.getItem('dss.btnMap') || '{}'); } catch (e) {}
+    let judgeOf = {};  // indeks gamepad -> nomor juri (0,1,2), hanya di memori
+    let joyMode = null; // null | { type: 'reg' | 'map', n }
+    const prevBtn = {};
+    let flashT;
+
+    const judgeLabel = (j) => 'Juri ' + (j + 1);
+    const judgeTotal = () => (last && last.settings.judgeCount) || 1;
+
+    function endMode() { joyMode = null; $('joyMsg').textContent = ''; }
+
+    function joyShow() {
+      if (joyMode && joyMode.type === 'reg') {
+        $('joyMsg').textContent = `Tekan tombol apa saja di joystick ${judgeLabel(joyMode.n)}...`;
+      } else if (joyMode && joyMode.type === 'map') {
+        $('joyMsg').textContent = `Tekan tombol untuk: ${ACTIONS[joyMode.n][2]} (${joyMode.n + 1}/${ACTIONS.length})`;
+      }
+      let s = '';
+      for (let j = 0; j < judgeTotal(); j++) {
+        const idx = Object.keys(judgeOf).find((k) => judgeOf[k] === j);
+        s += `${judgeLabel(j)}: ${idx === undefined ? '✗' : '✓ (indeks ' + idx + ')'}   `;
+      }
+      s += `| Tombol: ${Object.keys(btnMap).length}/${ACTIONS.length}`;
+      $('joyStat').textContent = s;
+    }
+
+    function joyFlash(t) {
+      $('joyMsg').textContent = t;
+      clearTimeout(flashT);
+      flashT = setTimeout(() => { if (!joyMode) $('joyMsg').textContent = ''; }, 1500);
+    }
+
+    function onPress(pad, bi) {
+      if (joyMode && joyMode.type === 'reg') {
+        if (pad in judgeOf) return; // joystick ini sudah terdaftar
+        judgeOf[pad] = joyMode.n;
+        joyMode.n++;
+        if (joyMode.n >= judgeTotal()) endMode();
+        return joyShow();
+      }
+      if (joyMode && joyMode.type === 'map') {
+        if (bi in btnMap) return; // tombol ini sudah dipakai aksi lain
+        btnMap[bi] = ACTIONS[joyMode.n][0] + ':' + ACTIONS[joyMode.n][1];
+        joyMode.n++;
+        if (joyMode.n >= ACTIONS.length) {
+          endMode();
+          try { localStorage.setItem('dss.btnMap', JSON.stringify(btnMap)); } catch (e) {}
+        }
+        return joyShow();
+      }
+      const j = judgeOf[pad];
+      const act = btnMap[bi];
+      if (j === undefined || !act) return;
+      const [side, tech] = act.split(':');
+      send('judge', { judge: j, side, tech });
+      joyFlash(`${judgeLabel(j)}: ${side.toUpperCase()} ${TECH_NAME[tech]}`);
+    }
+
+    function pollPads() {
+      const pads = (navigator.getGamepads ? Array.from(navigator.getGamepads()) : []).filter(Boolean);
+      for (const p of pads) {
+        const was = prevBtn[p.index] || [];
+        const now = p.buttons.map((b) => b.pressed);
+        now.forEach((on, bi) => { if (on && !was[bi]) onPress(p.index, bi); });
+        prevBtn[p.index] = now;
+      }
+    }
+
+    $('btnJoyReg').onclick = () => { judgeOf = {}; joyMode = { type: 'reg', n: 0 }; joyShow(); };
+    $('btnJoyMap').onclick = () => { btnMap = {}; joyMode = { type: 'map', n: 0 }; joyShow(); };
+    window.addEventListener('gamepaddisconnected', (e) => { delete judgeOf[e.gamepad.index]; joyShow(); });
+    setInterval(pollPads, 15);
+    setInterval(joyShow, 500);
+    joyShow();
 
     // spasi = start / pause
     document.addEventListener('keydown', (e) => {

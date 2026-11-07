@@ -13,6 +13,7 @@ const settings = {
   kyeshiTime: 60,    // detik kyeshi
   ivrQuota: 1,       // jatah IVR coach per pertandingan
   judgeCount: 1,     // 1, 2, atau 3 juri (menentukan pemberi suara Woo-se-girok)
+  consensusMs: 1000, // jendela waktu konsensus juri (milidetik)
 };
 try { Object.assign(settings, JSON.parse(fs.readFileSync(settingsFile, 'utf8'))); } catch (e) {}
 function saveSettings() {
@@ -262,6 +263,32 @@ function applyAdjs(adjs) {
   }
 }
 
+// ===== INPUT JURI (JOYSTICK) =====
+// Poin sah jika cukup juri menekan atlet + teknik yang sama dalam jendela waktu.
+// 1 juri: langsung sah. 2 atau 3 juri: minimal 2 juri berbeda.
+let pendingJudge = []; // { side, tech, judges: [0,1,...], t }
+
+function judgeInput(p) {
+  if (state.phase !== 'running') return;
+  if (!TECH[p.tech] || (p.side !== 'chung' && p.side !== 'hong')) return;
+  const need = settings.judgeCount === 1 ? 1 : 2;
+  const now = Date.now();
+  pendingJudge = pendingJudge.filter((x) => now - x.t <= settings.consensusMs);
+  let item = pendingJudge.find((x) => x.side === p.side && x.tech === p.tech);
+  if (!item) {
+    item = { side: p.side, tech: p.tech, judges: [], t: now };
+    pendingJudge.push(item);
+  }
+  if (item.judges.includes(p.judge)) return; // juri yang sama menekan lagi: diabaikan
+  item.judges.push(p.judge);
+  if (item.judges.length >= need) {
+    pendingJudge = pendingJudge.filter((x) => x !== item);
+    const who = item.judges.map((j) => j + 1).sort().join('+');
+    addScore(item.side, item.tech, 'Juri ' + who);
+    checkRound();
+  }
+}
+
 // ===== PERINTAH DARI OPERATOR / JOYSTICK =====
 function handle(type, p = {}) {
   const live = state.phase === 'running' || state.phase === 'paused';
@@ -276,6 +303,9 @@ function handle(type, p = {}) {
 
     case 'score': // p = { side, tech }
       if (scoring && TECH[p.tech]) { addScore(p.side, p.tech); checkRound(); }
+      break;
+    case 'judge': // dari joystick. p = { judge: 0|1|2, side, tech }
+      judgeInput(p);
       break;
     case 'gj': // p = { side (yang dikenai), passive }
       // Gam-jeom pasif hanya sah di 10 detik terakhir ronde
