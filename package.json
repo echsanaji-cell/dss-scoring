@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron .",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
   },
   "keywords": [],
   "author": "Ozone",
@@ -24,6 +25,10 @@
     ],
     "win": {
       "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "identity": null
     },
     "nsis": {
       "oneClick": false,
