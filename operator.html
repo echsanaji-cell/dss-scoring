@@ -166,6 +166,7 @@
     <button class="b-start" id="btnStart">▶ Shijak / Kye-sok</button>
     <button class="b-pause" id="btnPause">⏸ Kal-yeo</button>
     <button class="b-undo" id="btnUndo">↩ Undo</button>
+    <button class="b-sign" id="btnSign">➕ Mode: TAMBAH</button>
     <button class="b-test" id="btnTest">🧪 Test</button>
     <button class="b-kye" id="btnKyeshi">⏱ Kyeshi (Dokter)</button>
   </div>
@@ -186,6 +187,9 @@
 
   <!-- Rekap ronde -->
   <table class="op-table" id="recap"></table>
+
+  <!-- Log kejadian (✕ = hapus poin / Gam-jeom tertentu) -->
+  <div class="op-log" id="log"></div>
 
   <script>
     const { ipcRenderer } = require('electron');
@@ -412,6 +416,7 @@
           <td>${w ? w.toUpperCase() : '-'}</td></tr>`;
       }
       $('recap').innerHTML = rows;
+      $('log').innerHTML = logHTML(st);
     }
 
     ipcRenderer.invoke('getState').then(render);
@@ -421,9 +426,10 @@
     document.addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
-      if (b.dataset.tech) send('score', { side: b.dataset.side, tech: b.dataset.tech });
-      if (b.dataset.gj) send('gj', { side: b.dataset.gj, passive: false });
-      if (b.dataset.gjp) send('gj', { side: b.dataset.gjp, passive: true });
+      const minus = document.body.classList.contains('minus');
+      if (b.dataset.tech) send(minus ? 'unscore' : 'score', { side: b.dataset.side, tech: b.dataset.tech });
+      if (b.dataset.gj) send(minus ? 'ungj' : 'gj', { side: b.dataset.gj, passive: false });
+      if (b.dataset.gjp) send(minus ? 'ungj' : 'gj', { side: b.dataset.gjp, passive: true });
       if (b.dataset.ivr) send('ivr', { kind: 'coach', side: b.dataset.ivr });
       if (b.dataset.ivrp) { adj.side = b.dataset.ivrp; showIvrSel(); }
       if (b.dataset.ivrk) { adj.kind = b.dataset.ivrk; showIvrSel(); }
@@ -460,6 +466,12 @@
         send('newMatch');
       }
     };
+    // ===== MODE TAMBAH / KURANG =====
+    $('btnSign').onclick = () => {
+      const on = document.body.classList.toggle('minus');
+      $('btnSign').textContent = on ? '➖ Mode: KURANG' : '➕ Mode: TAMBAH';
+    };
+
     // ===== MENU DROPDOWN =====
     function closeMenus(exceptPanel) {
       document.querySelectorAll('.dd').forEach((dd) => {

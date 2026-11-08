@@ -344,3 +344,9 @@ body[data-phase="timeUp"] .timer { background: #c62828; color: #fff; }
 .menu-panel .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .menu-panel .op-settings { margin: 0; padding: 0; background: transparent; flex-direction: column; align-items: flex-start; gap: 10px; }
 .menu-panel #joyStat { font-size: 13px; line-height: 1.6; }
+
+/* ===== MODE KURANG ===== */
+.b-sign { background: #2e7d32 !important; }
+body.minus .op-pts button,
+body.minus .op-gj { background: #c62828 !important; color: #fff !important; box-shadow: inset 0 0 0 3px #ff8a80; }
+body.minus .op-head::after { content: '  ·  MODE KURANG'; color: #ffeb3b; }

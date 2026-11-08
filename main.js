@@ -344,6 +344,19 @@ function handle(type, p = {}) {
       break;
     }
 
+    case 'unscore': // kurangi poin: hapus kejadian poin terakhir (sisi + teknik sama) di ronde ini
+    case 'ungj': {  // kurangi Gam-jeom: hapus kejadian Gam-jeom terakhir sisi ini
+      const okPhase = ['running', 'paused', 'timeUp', 'roundEnd', 'rest', 'tie'].includes(state.phase) ||
+        (state.phase === 'ended' && state.endedBy === 'round');
+      if (!okPhase) break;
+      const found = [...state.events].reverse().find((e) => e.round === state.round && e.side === p.side &&
+        (type === 'unscore' ? (e.kind === 'score' && e.tech === p.tech) : e.kind === 'gj'));
+      if (!found || !removeEvent(found.id)) break;
+      reopenIfNeeded();
+      checkRound();
+      break;
+    }
+
     case 'setTime': // p = { seconds } koreksi waktu
       if (['waiting', 'paused', 'ivr', 'timeUp'].includes(state.phase)) {
         state.timeLeft = Math.max(0, Math.min(5999, Math.floor(Number(p.seconds) || 0)));
