@@ -282,7 +282,7 @@
         const note = e.note ? ` <small>(${e.note})</small>` : '';
         const del = e.kind !== 'ivr' && e.round === st.round && canDel
           ? `<button class="x" data-del="${e.id}">✕</button>` : '';
-        return `<tr class="${e.kind}"><td>R${e.round}</td><td>${fmt(e.t)}</td><td>${txt}${note}</td><td>${del}</td></tr>`;
+        return `<tr class="ev-${e.kind}"><td>R${e.round}</td><td>${fmt(e.t)}</td><td>${txt}${note}</td><td>${del}</td></tr>`;
       });
       return rows.length
         ? `<table><tr><th>Ronde</th><th>Waktu</th><th>Kejadian</th><th></th></tr>${rows.join('')}</table>`

@@ -227,7 +227,7 @@ body[data-phase="tie"] .tie { display: block; }
 .op-log { margin-top: 12px; max-height: 260px; overflow: auto; background: #222; border-radius: 8px; }
 .op-log table { width: 100%; border-collapse: collapse; }
 .op-log th, .op-log td { padding: 5px 8px; border-bottom: 1px solid #333; text-align: left; }
-.op-log tr.ivr td { color: #90caf9; }
+.op-log tr.ev-ivr td { color: #90caf9; }
 .op-log button.x { background: #5a1a1a !important; padding: 2px 8px; }
 
 /* scoreboard: tiebreaker */

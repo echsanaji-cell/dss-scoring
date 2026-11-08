@@ -46,7 +46,6 @@ const META = {
       'Poin teknik (juri)',
       'Gam-jeom terhadap atlet sendiri',
       'Salah identifikasi pelaku pukulan (biru/merah)',
-      'Tendangan kepala tidak terhitung (hanya jika Head PSS tidak dipakai)',
     ],
     referee: [
       '5 detik terakhir: jatuh / keluar garis / serang setelah Kal-yeo / serang lawan jatuh',
@@ -60,6 +59,7 @@ const META = {
       'Salah input scoreboard',
       'Tes PSS',
       'Wasit lupa membatalkan poin setelah Gam-jeom',
+      'Mengembalikan poin yang dicetak sebelum Gam-jeom',
     ],
   },
 };
