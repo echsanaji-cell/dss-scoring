@@ -350,3 +350,6 @@ body[data-phase="timeUp"] .timer { background: #c62828; color: #fff; }
 body.minus .op-pts button,
 body.minus .op-gj { background: #c62828 !important; color: #fff !important; box-shadow: inset 0 0 0 3px #ff8a80; }
 body.minus .op-head::after { content: '  ·  MODE KURANG'; color: #ffeb3b; }
+
+/* tombol poin teknikal */
+.op-pts button[data-technical] { background: #5e35b1 !important; color: #fff !important; }

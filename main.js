@@ -23,6 +23,9 @@ function saveSettings() {
 
 // ===== DATA ATURAN =====
 const TECH = { punch: 1, trunk: 2, head: 3, 'trunk-turn': 4, 'head-turn': 6 };
+// poin teknikal: tambahan untuk tendangan putar (dasar 2 + 2 = 4, dasar 3 + 3 = 6)
+const TECH_BONUS = { trunk: 2, head: 3 };
+const TECH_BONUS_KEY = { trunk: 'trunk-tech', head: 'head-tech' };
 
 const META = {
   // [kode, nama, pasif?]  Gam-jeom pasif di 10 detik terakhir ronde = 2 poin untuk lawan
@@ -149,10 +152,31 @@ function addGamjeom(side, passive, note) {
   logEvent({ kind: 'gj', side, passive: !!passive, pts: passive ? 2 : 1, note });
 }
 
+// tendangan dasar (badan/kepala) terakhir sisi ini di ronde ini yang belum punya teknikal
+function pendingBase(side, kind) {
+  const linked = new Set(state.events.filter((e) => e.base).map((e) => e.base));
+  for (let i = state.events.length - 1; i >= 0; i--) {
+    const e = state.events[i];
+    if (e.round === state.round && e.kind === 'score' && e.side === side && e.tech === kind && !linked.has(e.id)) return e;
+  }
+  return null;
+}
+
+function addTechnical(side, kind) {
+  const base = pendingBase(side, kind);
+  if (!base) return false;
+  logEvent({
+    kind: 'score', side, tech: TECH_BONUS_KEY[kind], pts: TECH_BONUS[kind], base: base.id,
+    note: kind === 'head' ? 'putar kepala' : 'putar badan',
+  });
+  return true;
+}
+
 function removeEvent(id) {
   const idx = state.events.findIndex((e) => e.id === id && e.round === state.round);
   if (idx < 0) return false;
   state.events.splice(idx, 1);
+  state.events = state.events.filter((e) => e.base !== id); // teknikal yang menempel ikut terhapus
   recompute();
   return true;
 }
@@ -214,10 +238,15 @@ function tieSteps() {
   const isPunch = (e) => e.tech === 'punch';
   const sum = (s, f) => sc(s, f).reduce((a, e) => a + e.pts, 0);
   const cnt = (s, f) => sc(s, f).length;
+  // teknikal + tendangan dasar yang ditempelinya = satu tendangan putar (poin dasar + teknikal)
+  const techTurn = (s) => ev.filter((e) => e.kind === 'score' && e.side === s && e.base).reduce((a, e) => {
+    const base = ev.find((b) => b.id === e.base);
+    return a + e.pts + (base ? base.pts : 0);
+  }, 0);
   // poin yang DITERIMA s dari gam-jeom lawan
   const gjp = (s) => ev.filter((e) => e.kind === 'gj' && e.side === other(s)).reduce((a, e) => a + e.pts, 0);
   return [
-    { title: 'POIN TENDANGAN PUTAR', chung: sum('chung', isTurn), hong: sum('hong', isTurn) },
+    { title: 'POIN TENDANGAN PUTAR', chung: sum('chung', isTurn) + techTurn('chung'), hong: sum('hong', isTurn) + techTurn('hong') },
     { title: 'TEKNIK KEPALA (3 POIN)', chung: cnt('chung', isHead), hong: cnt('hong', isHead) },
     { title: 'TEKNIK BADAN (2 POIN)', chung: cnt('chung', isTrunk), hong: cnt('hong', isTrunk) },
     { title: 'TEKNIK PUKULAN (1 POIN)', chung: cnt('chung', isPunch), hong: cnt('hong', isPunch) },
@@ -345,13 +374,22 @@ function handle(type, p = {}) {
       break;
     }
 
+    case 'technical': // p = { side, kind: 'trunk'|'head' } tambah teknikal ke tendangan dasar terakhir
+      if (['running', 'paused', 'timeUp'].includes(state.phase) && TECH_BONUS[p.kind] &&
+          (p.side === 'chung' || p.side === 'hong')) {
+        if (addTechnical(p.side, p.kind)) checkRound();
+      }
+      break;
     case 'unscore': // kurangi poin: hapus kejadian poin terakhir (sisi + teknik sama) di ronde ini
+    case 'untechnical': // kurangi teknikal: hapus teknikal terakhir (sisi + jenis) di ronde ini
     case 'ungj': {  // kurangi Gam-jeom: hapus kejadian Gam-jeom terakhir sisi ini
       const okPhase = ['running', 'paused', 'timeUp', 'roundEnd', 'rest', 'tie'].includes(state.phase) ||
         (state.phase === 'ended' && state.endedBy === 'round');
       if (!okPhase) break;
       const found = [...state.events].reverse().find((e) => e.round === state.round && e.side === p.side &&
-        (type === 'unscore' ? (e.kind === 'score' && e.tech === p.tech) : e.kind === 'gj'));
+        (type === 'unscore' ? (e.kind === 'score' && e.tech === p.tech)
+          : type === 'untechnical' ? (e.kind === 'score' && e.tech === TECH_BONUS_KEY[p.kind])
+          : e.kind === 'gj'));
       if (!found || !removeEvent(found.id)) break;
       reopenIfNeeded();
       checkRound();
@@ -607,8 +645,22 @@ ipcMain.on('fullscreen', (e) => {
   w.setFullScreen(!w.isFullScreen());
 });
 
+// scoreboard bisa tertutup tidak sengaja: tombol di operator membukanya kembali
+let scoreboardWin = null;
+function openScoreboard() {
+  if (scoreboardWin && !scoreboardWin.isDestroyed()) {
+    if (scoreboardWin.isMinimized()) scoreboardWin.restore();
+    scoreboardWin.show();
+    scoreboardWin.focus();
+    return;
+  }
+  scoreboardWin = createWindow('scoreboard.html');
+  scoreboardWin.on('closed', () => { scoreboardWin = null; });
+}
+ipcMain.on('openScoreboard', openScoreboard);
+
 app.whenReady().then(() => {
-  createWindow('scoreboard.html');
+  openScoreboard();
   createWindow('operator.html', { x: 80, y: 60, width: 1100, height: 760 });
 });
 
