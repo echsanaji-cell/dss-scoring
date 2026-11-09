@@ -254,6 +254,18 @@
 
     let last = null;
     let lastTimeKey = '';
+
+    // jangan bangun ulang DOM kalau isinya sama: elemen yang diganti di tengah klik membuat klik hilang
+    (() => {
+      const desc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+      ['log', 'recap', 'ivrList', 'tieTable', 'votes', 'tieConfirm'].forEach((id) => {
+        const el = document.getElementById(id);
+        Object.defineProperty(el, 'innerHTML', {
+          get() { return desc.get.call(this); },
+          set(v) { if (this.__html !== v) { this.__html = v; desc.set.call(this, v); } },
+        });
+      });
+    })();
     let lastIvrKind = null;
     let ivrReq = 'wasit';
     let adj = { side: null, kind: null, sign: 1 };

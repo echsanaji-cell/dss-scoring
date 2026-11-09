@@ -41,10 +41,7 @@
     "electron": "^43.8.7",
     "electron-builder": "^26.18.0"
   },
-  "allowScripts": {
-    "electron@30.5.1": true
-  },
   "dependencies": {
-    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

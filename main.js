@@ -566,11 +566,6 @@ function handle(type, p = {}) {
       }
       break;
 
-    case 'test':
-      if (state.phase === 'waiting') state.phase = 'test';
-      else if (state.phase === 'test') state.phase = 'waiting';
-      break;
-
     case 'kyeshi': // timer cedera / dokter
       if (live) {
         state.phase = 'kyeshi';
@@ -810,7 +805,11 @@ ipcMain.handle('schedule:import', async (e) => {
       const o = old.get(key(x));
       if (o) { x.status = o.status; x.result = o.result; }
     });
+    // pertandingan yang sedang dimuat tetap menunjuk baris yang sama setelah jadwal diganti
+    const curRow = tournament.schedule.find((x) => x.id === state.scheduleId);
     tournament.schedule = res.rows;
+    const again = curRow ? res.rows.find((x) => key(x) === key(curRow)) : null;
+    state.scheduleId = again ? again.id : null;
     saveTournament();
     broadcastTournament();
     return { ok: true, msg: `${res.rows.length} pertandingan diimpor.` };

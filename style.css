@@ -141,8 +141,7 @@ body[data-phase="rest"] .op-timer { background: #00e676; }
 .op-gj { background: #ffc107 !important; color: #000 !important; font-weight: 800; }
 .op-wins { text-align: center; }
 
-.sup { display: none; gap: 10px; align-items: center; margin-top: 12px; padding: 10px; background: #4a3b00; border-radius: 8px; }
-body[data-phase="superiority"] .sup { display: flex; }
+
 .b-chung { background: #1565c0 !important; }
 .b-hong  { background: #d32f2f !important; }
 
@@ -164,17 +163,17 @@ body.minus .b-sign { background: #c62828 !important; }
 .op-settings.hidden { display: none; }
 .op-settings label { display: flex; align-items: center; gap: 8px; }
 .op-settings input[type="number"] { width: 90px; }
-.b-set { background: #37474f !important; }
+
 /* ===== TEST, DOCTOR, KYESHI ===== */
 body[data-phase="kyeshi"] .timer { background: #e53935; color: #fff; }
 body[data-phase="test"] .timer   { background: #607d8b; color: #fff; }
-.ov-test { font-size: 14vh; font-weight: 800; letter-spacing: .5vw; }
+
 
 .inj { display: none; gap: 10px; align-items: center; margin-top: 12px; padding: 10px; background: #5a1a1a; border-radius: 8px; }
 body[data-phase="kyeshi"] .inj { display: flex; }
 .inj span { flex: 1; }
 
-.b-test { background: #546e7a !important; }
+
 .b-kye  { background: #ad1457 !important; }
 /* ===== IVR ===== */
 .cam { font-size: 4vh; }
@@ -205,8 +204,6 @@ body[data-phase="ivr"] .ivr { display: block; }
 }
 .muted { opacity: .6; }
 
-.op-gjbar { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
-.gj-hint { color: #ffeb00; font-weight: 700; }
 
 .tie { display: none; margin-top: 12px; padding: 12px; background: #2a1a3a; border-radius: 8px; }
 body[data-phase="tie"] .tie { display: block; }
@@ -323,7 +320,6 @@ body[data-phase="timeUp"] .timer { background: #c62828; color: #fff; }
 .b-dev { background: #00695c !important; }
 
 .b-joy { background: #6a1b9a !important; }
-.joy { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 12px; font-size: 14px; }
 .joy-msg { font-weight: 700; color: #ffd600; }
 
 .joy-warn { color: #fff; background: #c62828; padding: 2px 8px; border-radius: 4px; font-weight: 700; }

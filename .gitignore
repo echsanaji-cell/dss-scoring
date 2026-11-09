@@ -1,4 +1,4 @@
 node_modules/
-Archive.zip
+*.zip
 dist/
 .DS_Store

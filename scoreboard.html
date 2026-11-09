@@ -352,9 +352,6 @@
           `<div class="ov-title">ROUND ${st.round} WINNER</div>` +
           `<div class="ov-name">${p.name} (${p.country})</div>` +
           `<div class="rw-score">${st.points.chung[i]} – ${st.points.hong[i]}</div>`;
-      } else if (st.phase === 'test') {
-        ov.className = 'overlay';
-        ov.innerHTML = `<div class="ov-test">TEST MODE</div>`;
       } else if (st.phase === 'tie' && st.tie.stage === 'summary') {
         // tabel ringkasan tiebreaker, tampil 2 detik
         const t = st.tie;
