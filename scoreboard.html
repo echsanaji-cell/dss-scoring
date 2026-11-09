@@ -285,6 +285,7 @@
       last = st;
       const i = st.round - 1;
       document.body.dataset.phase = st.phase;
+      document.body.classList.toggle('rev', !!(st.settings && st.settings.reversed));
       $('category').textContent = st.category;
 
       for (const s of ['chung', 'hong']) {

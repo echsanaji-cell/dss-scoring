@@ -672,6 +672,24 @@ function handle(type, p = {}) {
       state.chung = { name: p.chungName, country: p.chungCountry };
       state.hong = { name: p.hongName, country: p.hongCountry };
       break;
+    case 'reverse': // tukar posisi biru/merah di scoreboard dan operator
+      settings.reversed = !settings.reversed;
+      saveSettings();
+      break;
+    case 'delSchedule': { // p = { id } hapus baris jadwal yang sudah selesai
+      const row = tournament.schedule.find((r) => r.id === p.id);
+      if (row && row.status === 'selesai') {
+        tournament.schedule = tournament.schedule.filter((r) => r.id !== p.id);
+        saveTournament();
+        broadcastTournament();
+      }
+      break;
+    }
+    case 'delDone': // hapus semua baris jadwal yang sudah selesai
+      tournament.schedule = tournament.schedule.filter((r) => r.status !== 'selesai');
+      saveTournament();
+      broadcastTournament();
+      break;
     case 'loadMatch': { // p = { id } muat pertandingan dari jadwal (memulai pertandingan baru)
       const row = tournament.schedule.find((r) => r.id === p.id);
       if (!row) break;
@@ -881,23 +899,58 @@ ipcMain.on('fullscreen', (e) => {
   w.setFullScreen(!w.isFullScreen());
 });
 
-// scoreboard bisa tertutup tidak sengaja: tombol di operator membukanya kembali
+// ===== SCOREBOARD: jendela terpisah, otomatis layar penuh di layar tambahan (HDMI) =====
+let operatorWin = null;
 let scoreboardWin = null;
+
+function placeScoreboard() {
+  if (!scoreboardWin || scoreboardWin.isDestroyed()) return;
+  const { screen } = require('electron');
+  const mac = process.platform === 'darwin';
+  const isFs = () => (mac ? scoreboardWin.isSimpleFullScreen() : scoreboardWin.isFullScreen());
+  const setFs = (on) => (mac ? scoreboardWin.setSimpleFullScreen(on) : scoreboardWin.setFullScreen(on));
+  // layar tempat operator berada; scoreboard dikirim ke layar lain kalau ada
+  const opDisplay = operatorWin && !operatorWin.isDestroyed()
+    ? screen.getDisplayMatching(operatorWin.getBounds())
+    : screen.getPrimaryDisplay();
+  const target = screen.getAllDisplays().find((d) => d.id !== opDisplay.id);
+  if (target) {
+    const cur = screen.getDisplayMatching(scoreboardWin.getBounds());
+    if (!(isFs() && cur.id === target.id)) {
+      setFs(false);
+      scoreboardWin.setBounds(target.bounds);
+      setFs(true);
+    }
+  } else if (isFs()) {
+    // layar tambahan dicabut: kembali jadi jendela biasa di layar operator
+    setFs(false);
+    scoreboardWin.setBounds({ x: opDisplay.bounds.x + 120, y: opDisplay.bounds.y + 80, width: 1280, height: 720 });
+  }
+  // scoreboard tidak boleh mengambil fokus (joystick dan keyboard dibaca oleh jendela operator)
+  setTimeout(() => { if (operatorWin && !operatorWin.isDestroyed()) operatorWin.focus(); }, 300);
+}
+
 function openScoreboard() {
   if (scoreboardWin && !scoreboardWin.isDestroyed()) {
     if (scoreboardWin.isMinimized()) scoreboardWin.restore();
-    scoreboardWin.show();
-    scoreboardWin.focus();
+    scoreboardWin.showInactive();
+    placeScoreboard();
     return;
   }
-  scoreboardWin = createWindow('scoreboard.html');
+  scoreboardWin = createWindow('scoreboard.html', { show: false });
   scoreboardWin.on('closed', () => { scoreboardWin = null; });
+  scoreboardWin.once('ready-to-show', () => { scoreboardWin.showInactive(); placeScoreboard(); });
 }
 ipcMain.on('openScoreboard', openScoreboard);
 
 app.whenReady().then(() => {
   openScoreboard();
-  createWindow('operator.html', { x: 80, y: 60, width: 1100, height: 760 });
+  operatorWin = createWindow('operator.html', { x: 80, y: 60, width: 1100, height: 760 });
+  // layar HDMI dicolok / dicabut / berubah resolusi
+  const { screen } = require('electron');
+  ['display-added', 'display-removed', 'display-metrics-changed'].forEach((ev) => {
+    screen.on(ev, () => setTimeout(placeScoreboard, 800));
+  });
 });
 
 app.on('window-all-closed', () => app.quit());

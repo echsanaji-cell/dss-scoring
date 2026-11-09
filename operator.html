@@ -17,6 +17,7 @@
           <button class="b-joy" id="btnSchedImport">📥 Impor Excel</button>
           <button id="btnSchedTemplate">📄 Unduh template</button>
           <button class="b-ref" id="btnSchedNext">Berikutnya ▶</button>
+          <button id="btnSchedClear">🗑 Hapus yang selesai</button>
         </div>
         <div id="schedInfo" class="muted" style="font-size:12px"></div>
         <div class="sched-list" id="schedList"></div>
@@ -94,6 +95,7 @@
     </div>
 
     <button class="b-dev" id="btnScoreboard">🖥 Tampilkan Scoreboard</button>
+    <button class="b-dev" id="btnReverse">⇄ Tukar sisi</button>
     <span class="joy-msg" id="joyMsg"></span>
     <span class="joy-warn" id="joyWarn"></span>
   </div>
@@ -342,6 +344,7 @@
       const i = st.round - 1;
       const scoring = st.phase === 'running' || st.phase === 'paused' || st.phase === 'timeUp';
       document.body.dataset.phase = st.phase;
+      document.body.classList.toggle('rev', !!(st.settings && st.settings.reversed));
 
       setVal('category', st.category);
       setVal('matchNo', st.matchNo);
@@ -506,6 +509,7 @@
     $('btnUndo').onclick = () => send('undo');
     $('btnDev').onclick = () => ipcRenderer.send('openDevTest');
     $('btnScoreboard').onclick = () => ipcRenderer.send('openScoreboard');
+    $('btnReverse').onclick = () => send('reverse');
     $('btnFinish').onclick = () => send('finish');
     $('btnReopen').onclick = () => send('reopen');
     $('btnKyeshi').onclick = () => send('kyeshi');
@@ -527,6 +531,7 @@
     // ===== JADWAL PERTANDINGAN =====
     let tourn = { schedule: [], results: [] };
     let armedLoad = null;   // id baris yang menunggu klik kedua (konfirmasi mengganti pertandingan)
+    let armedDel = null;    // id baris yang menunggu klik kedua (konfirmasi hapus)
     let shownSchedId;       // untuk menandai baris jadwal yang sedang dimuat
 
     function matchInProgress() {
@@ -557,7 +562,9 @@
             `<td>${esc(r.no)}</td><td>${esc(r.category)}</td>` +
             `<td class="l">${esc(r.chungName)} <small>${esc(r.chungCountry)}</small> vs ${esc(r.hongName)} <small>${esc(r.hongCountry)}</small></td>` +
             `<td>${r.status === 'selesai' ? '✔ ' + esc(r.result) : '-'}</td>` +
-            `<td><button data-load="${r.id}">${armedLoad === r.id ? 'Klik lagi: ganti pertandingan' : 'Muat'}</button></td></tr>`;
+            `<td><button data-load="${r.id}">${armedLoad === r.id ? 'Klik lagi: ganti pertandingan' : 'Muat'}</button>` +
+            (r.status === 'selesai' ? ` <button data-del="${r.id}">${armedDel === r.id ? 'Klik lagi: hapus' : '🗑 Hapus'}</button>` : '') +
+            `</td></tr>`;
         }).join('') + `</table>` : '';
     }
 
@@ -566,8 +573,16 @@
 
     $('schedList').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-load]');
-      if (b) askLoad(Number(b.dataset.load));
+      if (b) return askLoad(Number(b.dataset.load));
+      const d = e.target.closest('button[data-del]');
+      if (!d) return;
+      const id = Number(d.dataset.del);
+      if (armedDel === id) { armedDel = null; return send('delSchedule', { id }); }
+      armedDel = id; // klik kedua untuk menghapus
+      renderSchedule();
+      setTimeout(() => { if (armedDel === id) { armedDel = null; renderSchedule(); } }, 3000);
     });
+    twoClick($('btnSchedClear'), () => send('delDone'));
     $('btnSchedNext').onclick = () => {
       const s = tourn.schedule;
       if (!s.length) return joyFlash('Jadwal masih kosong', 3000);

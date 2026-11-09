@@ -366,3 +366,10 @@ body.minus .op-head::after { content: '  ·  MODE KURANG'; color: #ffeb3b; }
 .sched-list td.l { text-align: left; }
 .sched-cur td { background: #1b3a5c; }
 .sched-list button { padding: 4px 8px; font-size: 12px; }
+
+/* tukar sisi biru/merah (scoreboard dan operator) */
+body.rev .main > .side.chung { order: 3; }
+body.rev .main > .side.hong { order: 1; }
+body.rev .main > :not(.side) { order: 2; }
+body.rev .op-main > .op-side.chung { order: 2; }
+body.rev .op-main > .op-side.hong { order: 1; }
