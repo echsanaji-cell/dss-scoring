@@ -357,3 +357,12 @@ body.minus .op-head::after { content: '  ·  MODE KURANG'; color: #ffeb3b; }
 /* banner pemulihan pertandingan */
 .restore { display: flex; align-items: center; gap: 12px; background: #1b5e20; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; font-size: 14px; }
 .restore button { margin-left: auto; }
+
+/* menu jadwal */
+.menu-panel.wide { min-width: 640px; }
+.sched-list { max-height: 300px; overflow: auto; }
+.sched-list table { width: 100%; font-size: 13px; }
+.sched-list td { padding: 4px 6px; }
+.sched-list td.l { text-align: left; }
+.sched-cur td { background: #1b3a5c; }
+.sched-list button { padding: 4px 8px; font-size: 12px; }

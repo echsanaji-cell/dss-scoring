@@ -43,5 +43,8 @@
   },
   "allowScripts": {
     "electron@30.5.1": true
+  },
+  "dependencies": {
+    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz"
   }
 }

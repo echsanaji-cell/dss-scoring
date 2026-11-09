@@ -10,6 +10,24 @@
   <!-- Menu: joystick, hasil, pengaturan (kontrol pertandingan ada di bawah, di luar menu) -->
   <div class="menubar">
     <div class="dd">
+      <button id="menuSched">📋 Jadwal ▾</button>
+      <div class="menu-panel wide hidden">
+        <h4>Jadwal pertandingan</h4>
+        <div class="row">
+          <button class="b-joy" id="btnSchedImport">📥 Impor Excel</button>
+          <button id="btnSchedTemplate">📄 Unduh template</button>
+          <button class="b-ref" id="btnSchedNext">Berikutnya ▶</button>
+        </div>
+        <div id="schedInfo" class="muted" style="font-size:12px"></div>
+        <div class="sched-list" id="schedList"></div>
+        <h4>Riwayat hasil</h4>
+        <div class="row">
+          <button class="b-ref" id="btnResExport">📤 Ekspor hasil (Excel/CSV)</button>
+          <span id="resInfo" class="muted" style="font-size:12px"></span>
+        </div>
+      </div>
+    </div>
+    <div class="dd">
       <button id="menuJoy">🎮 Joystick ▾</button>
       <div class="menu-panel hidden">
         <h4>Joystick juri</h4>
@@ -446,6 +464,7 @@
       }
       $('recap').innerHTML = rows;
       $('log').innerHTML = logHTML(st);
+      if (st.scheduleId !== shownSchedId) { shownSchedId = st.scheduleId; renderSchedule(); }
       // banner pemulihan
       if (st.restoredAt && st.restoredAt !== bannerDismissed) {
         $('restoreBanner').style.display = '';
@@ -505,6 +524,68 @@
         send('newMatch');
       }
     };
+    // ===== JADWAL PERTANDINGAN =====
+    let tourn = { schedule: [], results: [] };
+    let armedLoad = null;   // id baris yang menunggu klik kedua (konfirmasi mengganti pertandingan)
+    let shownSchedId;       // untuk menandai baris jadwal yang sedang dimuat
+
+    function matchInProgress() {
+      return !!(last && last.events.length > 0 && last.phase !== 'ended');
+    }
+    function loadMatch(id) {
+      armedLoad = null;
+      send('loadMatch', { id });
+    }
+    function askLoad(id) {
+      if (!matchInProgress() || armedLoad === id) return loadMatch(id);
+      armedLoad = id; // pertandingan yang sedang berjalan akan diganti: minta klik kedua
+      renderSchedule();
+      setTimeout(() => { if (armedLoad === id) { armedLoad = null; renderSchedule(); } }, 3000);
+    }
+
+    function renderSchedule() {
+      const s = tourn.schedule;
+      const done = s.filter((r) => r.status === 'selesai').length;
+      $('schedInfo').textContent = s.length
+        ? `${s.length} pertandingan · ${done} selesai`
+        : 'Belum ada jadwal. Klik Impor Excel (atau Unduh template untuk contoh formatnya).';
+      $('resInfo').textContent = `${tourn.results.length} hasil tersimpan`;
+      $('schedList').innerHTML = s.length ? `<table class="op-table">` +
+        s.map((r) => {
+          const cur = last && last.scheduleId === r.id;
+          return `<tr class="${cur ? 'sched-cur' : ''}">` +
+            `<td>${esc(r.no)}</td><td>${esc(r.category)}</td>` +
+            `<td class="l">${esc(r.chungName)} <small>${esc(r.chungCountry)}</small> vs ${esc(r.hongName)} <small>${esc(r.hongCountry)}</small></td>` +
+            `<td>${r.status === 'selesai' ? '✔ ' + esc(r.result) : '-'}</td>` +
+            `<td><button data-load="${r.id}">${armedLoad === r.id ? 'Klik lagi: ganti pertandingan' : 'Muat'}</button></td></tr>`;
+        }).join('') + `</table>` : '';
+    }
+
+    ipcRenderer.on('tournament', (e, t) => { tourn = t; renderSchedule(); });
+    ipcRenderer.invoke('getTournament').then((t) => { tourn = t; renderSchedule(); });
+
+    $('schedList').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-load]');
+      if (b) askLoad(Number(b.dataset.load));
+    });
+    $('btnSchedNext').onclick = () => {
+      const s = tourn.schedule;
+      if (!s.length) return joyFlash('Jadwal masih kosong', 3000);
+      const curIdx = last && last.scheduleId ? s.findIndex((r) => r.id === last.scheduleId) : -1;
+      const next = s.find((r, i) => i > curIdx && r.status !== 'selesai') || s.find((r) => r.status !== 'selesai');
+      if (!next) return joyFlash('Semua pertandingan di jadwal sudah selesai', 3000);
+      askLoad(next.id);
+    };
+    $('btnSchedImport').onclick = async () => {
+      const res = await ipcRenderer.invoke('schedule:import');
+      if (res && res.msg) joyFlash(res.msg, 8000);
+    };
+    $('btnSchedTemplate').onclick = async () => { await ipcRenderer.invoke('schedule:template'); };
+    $('btnResExport').onclick = async () => {
+      const p = await ipcRenderer.invoke('results:export');
+      if (p) joyFlash('Hasil diekspor', 3000);
+    };
+
     // ===== BANNER PEMULIHAN =====
     let bannerDismissed = 0;
     $('restoreClose').onclick = () => {
@@ -641,10 +722,10 @@
       $('joyWarn').textContent = warn;
     }
 
-    function joyFlash(t) {
+    function joyFlash(t, ms = 1500) {
       $('joyMsg').textContent = t;
       clearTimeout(flashT);
-      flashT = setTimeout(() => { if (!joyMode) $('joyMsg').textContent = ''; }, 1500);
+      flashT = setTimeout(() => { if (!joyMode) $('joyMsg').textContent = ''; }, ms);
     }
 
     // Kombinasi tombol (satu juri, satu atlet, ditekan hampir bersamaan):

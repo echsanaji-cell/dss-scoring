@@ -101,7 +101,10 @@ function newMatch() {
     roundWinner: [null, null, null],
     winner: null,
     endedBy: null,    // 'round' | 'injury' | 'manual'
-    resultCode: null, // PTF | RSC | WDR | DSQ
+    resultCode: null, // PTF | RSC | WDR | DSQ | DQB
+    uid: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), // identitas pertandingan ini
+    scheduleId: null, // id baris jadwal yang dimuat (jika ada)
+    recorded: false,  // hasil sudah masuk riwayat
     savedTime: 0,
     settings,
     meta: META,
@@ -151,6 +154,106 @@ function loadSavedMatch() {
 }
 loadSavedMatch();
 app.on('before-quit', saveMatchNow);
+
+// ===== JADWAL & RIWAYAT HASIL (disimpan di userData/tournament.json) =====
+const tournamentFile = path.join(app.getPath('userData'), 'tournament.json');
+const tournament = { schedule: [], results: [] };
+try { Object.assign(tournament, JSON.parse(fs.readFileSync(tournamentFile, 'utf8'))); } catch (e) {}
+
+function saveTournament() {
+  try {
+    fs.writeFileSync(tournamentFile + '.tmp', JSON.stringify(tournament));
+    fs.renameSync(tournamentFile + '.tmp', tournamentFile);
+  } catch (e) {}
+}
+function broadcastTournament() {
+  for (const w of windows) w.webContents.send('tournament', tournament);
+}
+
+// baca baris Excel/CSV (array of array) menjadi daftar pertandingan
+function parseSchedule(aoa) {
+  const norm = (s) => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const hi = aoa.findIndex((r) => r.some((c) => String(c).trim() !== ''));
+  if (hi < 0) return { rows: [], error: 'File kosong.' };
+  const idx = {};
+  const NO = ['no', 'nomor', 'nomatch', 'nomormatch', 'match', 'matchno', 'partai', 'nopartai', 'nomorpartai', 'urut', 'nourut'];
+  aoa[hi].forEach((h, i) => {
+    const n = norm(h);
+    if (!n) return;
+    const side = /chung|biru|blue/.test(n) ? 'chung' : /hong|merah|red/.test(n) ? 'hong' : '';
+    const isCountry = /negara|country|kontingen|dojang|klub|club|team/.test(n);
+    let key = null;
+    if (side) key = side + (isCountry ? 'Country' : 'Name');
+    else if (/kategori|category|kelas|class|divisi/.test(n)) key = 'category';
+    else if (NO.includes(n)) key = 'no';
+    if (key && idx[key] === undefined) idx[key] = i;
+  });
+  if (idx.chungName === undefined || idx.hongName === undefined) {
+    return { rows: [], error: 'Kolom nama Chung/Hong tidak ditemukan. Judul kolom yang terbaca: ' + aoa[hi].filter(Boolean).join(', ') + '. Coba pakai template.' };
+  }
+  const cell = (r, k) => (idx[k] === undefined ? '' : String(r[idx[k]] == null ? '' : r[idx[k]]).trim());
+  const rows = [];
+  aoa.slice(hi + 1).forEach((r) => {
+    const chungName = cell(r, 'chungName');
+    const hongName = cell(r, 'hongName');
+    if (!chungName && !hongName) return;
+    rows.push({
+      id: rows.length + 1,
+      no: cell(r, 'no') || String(rows.length + 1).padStart(3, '0'),
+      category: cell(r, 'category'),
+      chungName, chungCountry: cell(r, 'chungCountry'),
+      hongName, hongCountry: cell(r, 'hongCountry'),
+      status: 'belum', result: '',
+    });
+  });
+  return { rows, error: '' };
+}
+
+// satu baris hasil dari pertandingan yang sedang selesai
+function buildResultRow() {
+  const w = state.winner;
+  return {
+    uid: state.uid, no: state.matchNo, category: state.category,
+    chung: { ...state.chung }, hong: { ...state.hong },
+    winner: w, winnerName: w ? state[w].name : '', code: state.resultCode || '',
+    rounds: state.round,
+    roundsWon: {
+      chung: state.roundWinner.filter((x) => x === 'chung').length,
+      hong: state.roundWinner.filter((x) => x === 'hong').length,
+    },
+    points: { chung: [...state.points.chung], hong: [...state.points.hong] },
+    gamjeom: { chung: [...state.gamjeom.chung], hong: [...state.gamjeom.hong] },
+  };
+}
+
+let lastResultJson = '';
+function markSchedule(status, text) {
+  const r = tournament.schedule.find((x) => x.id === state.scheduleId);
+  if (r) { r.status = status; r.result = text || ''; }
+}
+// hasil masuk riwayat saat pertandingan selesai; dicabut lagi kalau hasilnya dibatalkan
+function syncResult() {
+  if (state.phase === 'ended') {
+    const row = buildResultRow();
+    const json = JSON.stringify(row);
+    if (state.recorded && json === lastResultJson) return;
+    lastResultJson = json;
+    const i = tournament.results.findIndex((x) => x.uid === state.uid);
+    row.endedAt = i >= 0 ? tournament.results[i].endedAt : Date.now();
+    if (i >= 0) tournament.results[i] = row; else tournament.results.push(row);
+    state.recorded = true;
+    markSchedule('selesai', `${row.winnerName} (${row.code})`);
+    saveTournament();
+    broadcastTournament();
+  } else if (state.recorded) {
+    tournament.results = tournament.results.filter((x) => x.uid !== state.uid);
+    state.recorded = false;
+    lastResultJson = '';
+    markSchedule('belum', '');
+    saveTournament();
+    broadcastTournament();
+  }
+}
 
 // ===== LOG KEJADIAN & PERHITUNGAN =====
 const other = (s) => (s === 'chung' ? 'hong' : 'chung');
@@ -569,6 +672,18 @@ function handle(type, p = {}) {
       state.chung = { name: p.chungName, country: p.chungCountry };
       state.hong = { name: p.hongName, country: p.hongCountry };
       break;
+    case 'loadMatch': { // p = { id } muat pertandingan dari jadwal (memulai pertandingan baru)
+      const row = tournament.schedule.find((r) => r.id === p.id);
+      if (!row) break;
+      state = newMatch();
+      nextId = 1;
+      state.category = row.category || state.category;
+      state.matchNo = row.no || state.matchNo;
+      state.chung = { name: row.chungName, country: row.chungCountry };
+      state.hong = { name: row.hongName, country: row.hongCountry };
+      state.scheduleId = row.id;
+      break;
+    }
     case 'newMatch':
       state = newMatch();
       nextId = 1;
@@ -646,11 +761,97 @@ function createWindow(file, opts = {}) {
 }
 
 function broadcast() {
+  syncResult();
   for (const w of windows) w.webContents.send('state', state);
   scheduleSave();
 }
 
 ipcMain.handle('getState', () => state);
+ipcMain.handle('getTournament', () => tournament);
+
+// impor jadwal dari Excel / CSV
+ipcMain.handle('schedule:import', async (e) => {
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showOpenDialog(parent, {
+    properties: ['openFile'],
+    filters: [{ name: 'Excel / CSV', extensions: ['xlsx', 'xls', 'csv'] }],
+  });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePaths.length) return { ok: false, msg: '' };
+  try {
+    const XLSX = require('xlsx');
+    const wb = XLSX.readFile(r.filePaths[0]);
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: false });
+    const res = parseSchedule(aoa);
+    if (!res.rows.length) return { ok: false, msg: res.error || 'Tidak ada pertandingan yang terbaca.' };
+    // pertandingan yang sama (nomor + nama) tetap berstatus selesai
+    const key = (x) => `${x.no}|${x.chungName}|${x.hongName}`.toLowerCase();
+    const old = new Map(tournament.schedule.map((x) => [key(x), x]));
+    res.rows.forEach((x) => {
+      const o = old.get(key(x));
+      if (o) { x.status = o.status; x.result = o.result; }
+    });
+    tournament.schedule = res.rows;
+    saveTournament();
+    broadcastTournament();
+    return { ok: true, msg: `${res.rows.length} pertandingan diimpor.` };
+  } catch (err) {
+    return { ok: false, msg: 'Gagal membaca file: ' + err.message };
+  }
+});
+
+// template Excel contoh
+ipcMain.handle('schedule:template', async (e) => {
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showSaveDialog(parent, { defaultPath: 'Template-Jadwal-DSS.xlsx', filters: [{ name: 'Excel', extensions: ['xlsx'] }] });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePath) return null;
+  try {
+    const XLSX = require('xlsx');
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['No', 'Kategori', 'Chung (Biru)', 'Negara Chung', 'Hong (Merah)', 'Negara Hong'],
+      ['001', 'Male -58 kg', 'Nama atlet biru', 'INA', 'Nama atlet merah', 'INA'],
+      ['002', 'Female -49 kg', 'Nama atlet biru', 'INA', 'Nama atlet merah', 'INA'],
+    ]);
+    ws['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 26 }, { wch: 14 }, { wch: 26 }, { wch: 14 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Jadwal');
+    XLSX.writeFile(wb, r.filePath);
+    shell.showItemInFolder(r.filePath);
+    return r.filePath;
+  } catch (err) { return null; }
+});
+
+// ekspor riwayat hasil ke Excel / CSV
+ipcMain.handle('results:export', async (e) => {
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showSaveDialog(parent, {
+    defaultPath: 'Hasil-Pertandingan.xlsx',
+    filters: [{ name: 'Excel', extensions: ['xlsx'] }, { name: 'CSV', extensions: ['csv'] }],
+  });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePath) return null;
+  try {
+    const XLSX = require('xlsx');
+    const head = ['No', 'Kategori', 'Chung', 'Negara Chung', 'Hong', 'Negara Hong', 'Pemenang', 'Kode hasil',
+      'Ronde menang Chung', 'Ronde menang Hong', 'R1 Chung', 'R1 Hong', 'R2 Chung', 'R2 Hong', 'R3 Chung', 'R3 Hong',
+      'Gam-jeom Chung', 'Gam-jeom Hong', 'Selesai'];
+    const rows = tournament.results.map((x) => {
+      const pt = (s, i) => (i < x.rounds ? x.points[s][i] : '');
+      const sum = (a) => a.reduce((p, q) => p + q, 0);
+      return [x.no, x.category, x.chung.name, x.chung.country, x.hong.name, x.hong.country, x.winnerName, x.code,
+        x.roundsWon.chung, x.roundsWon.hong,
+        pt('chung', 0), pt('hong', 0), pt('chung', 1), pt('hong', 1), pt('chung', 2), pt('hong', 2),
+        sum(x.gamjeom.chung), sum(x.gamjeom.hong), new Date(x.endedAt).toLocaleString('id-ID')];
+    });
+    const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Hasil');
+    XLSX.writeFile(wb, r.filePath);
+    shell.showItemInFolder(r.filePath);
+    return r.filePath;
+  } catch (err) { return null; }
+});
 ipcMain.on('cmd', (e, type, payload) => handle(type, payload));
 ipcMain.on('openDevTest', () => {
   createWindow('devtest.html', { width: 1100, height: 780, backgroundColor: '#000000' });
