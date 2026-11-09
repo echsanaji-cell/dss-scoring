@@ -253,7 +253,6 @@
       : ['Center Referee', 'Judge', 'Review Jury']);
 
     let last = null;
-    let gjFilled = false;
     let lastTimeKey = '';
     let lastIvrKind = null;
     let ivrReq = 'wasit';
@@ -320,7 +319,6 @@
     function logHTML(st) {
       const canDel = ['running', 'paused', 'rest', 'tie'].includes(st.phase) ||
         (st.phase === 'ended' && st.endedBy === 'round');
-      const gjName = (code) => (st.meta.gj.find((x) => x[0] === code) || [0, code])[1];
       const rows = st.events.slice().reverse().slice(0, 40).map((e) => {
         let txt = '';
         if (e.kind === 'score') txt = `${SIDE[e.side]}: ${TECH_NAME[e.tech]} +${e.pts}`;

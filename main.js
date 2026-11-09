@@ -76,11 +76,6 @@ META.result = {
   DQB: 'Disqualification for Unsportsmanlike Behavior',
 };
 
-const isPassive = (code) => {
-  const r = META.gj.find((x) => x[0] === code);
-  return !!(r && r[2]);
-};
-
 // ===== STATE PERTANDINGAN =====
 let nextId = 1;
 
@@ -170,6 +165,9 @@ function broadcastTournament() {
   for (const w of windows) w.webContents.send('tournament', tournament);
 }
 
+// buang karakter yang bisa membentuk tag HTML dan batasi panjang (nama/kategori dari Excel atau input)
+const clean = (s, max = 60) => String(s == null ? '' : s).replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, max);
+
 // baca baris Excel/CSV (array of array) menjadi daftar pertandingan
 function parseSchedule(aoa) {
   const norm = (s) => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -191,7 +189,7 @@ function parseSchedule(aoa) {
   if (idx.chungName === undefined || idx.hongName === undefined) {
     return { rows: [], error: 'Kolom nama Chung/Hong tidak ditemukan. Judul kolom yang terbaca: ' + aoa[hi].filter(Boolean).join(', ') + '. Coba pakai template.' };
   }
-  const cell = (r, k) => (idx[k] === undefined ? '' : String(r[idx[k]] == null ? '' : r[idx[k]]).trim());
+  const cell = (r, k) => (idx[k] === undefined ? '' : clean(r[idx[k]]));
   const rows = [];
   aoa.slice(hi + 1).forEach((r) => {
     const chungName = cell(r, 'chungName');
@@ -667,10 +665,10 @@ function handle(type, p = {}) {
       checkRound();
       break;
     case 'setInfo':
-      state.category = p.category;
-      state.matchNo = p.matchNo;
-      state.chung = { name: p.chungName, country: p.chungCountry };
-      state.hong = { name: p.hongName, country: p.hongCountry };
+      state.category = clean(p.category);
+      state.matchNo = clean(p.matchNo, 20);
+      state.chung = { name: clean(p.chungName), country: clean(p.chungCountry, 20) };
+      state.hong = { name: clean(p.hongName), country: clean(p.hongCountry, 20) };
       break;
     case 'reverse': // tukar posisi biru/merah di scoreboard dan operator
       settings.reversed = !settings.reversed;
@@ -695,10 +693,10 @@ function handle(type, p = {}) {
       if (!row) break;
       state = newMatch();
       nextId = 1;
-      state.category = row.category || state.category;
-      state.matchNo = row.no || state.matchNo;
-      state.chung = { name: row.chungName, country: row.chungCountry };
-      state.hong = { name: row.hongName, country: row.hongCountry };
+      state.category = clean(row.category) || state.category;
+      state.matchNo = clean(row.no, 20) || state.matchNo;
+      state.chung = { name: clean(row.chungName), country: clean(row.chungCountry, 20) };
+      state.hong = { name: clean(row.hongName), country: clean(row.hongCountry, 20) };
       state.scheduleId = row.id;
       break;
     }
@@ -774,6 +772,9 @@ function createWindow(file, opts = {}) {
   });
   win.loadFile(file);
   windows.push(win);
+  // jendela hanya boleh menampilkan file lokal aplikasi
+  win.webContents.on('will-navigate', (e) => e.preventDefault());
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.on('closed', () => windows.splice(windows.indexOf(win), 1));
   return win;
 }
@@ -876,7 +877,7 @@ ipcMain.on('openDevTest', () => {
 });
 // Record Paper: HTML dari operator dijadikan PDF, lalu disimpan lewat dialog
 ipcMain.handle('saveRecord', async (e, html, name) => {
-  const tmp = path.join(os.tmpdir(), 'dss-record.html');
+  const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'dss-')), 'record.html');
   fs.writeFileSync(tmp, html, 'utf8');
   const parent = BrowserWindow.fromWebContents(e.sender);
   const win = new BrowserWindow({ show: false });
@@ -890,6 +891,7 @@ ipcMain.handle('saveRecord', async (e, html, name) => {
     return r.filePath;
   } finally {
     win.destroy();
+    try { fs.rmSync(path.dirname(tmp), { recursive: true, force: true }); } catch (e) {}
     if (parent) parent.focus();
   }
 });
@@ -943,9 +945,21 @@ function openScoreboard() {
 }
 ipcMain.on('openScoreboard', openScoreboard);
 
+// hanya satu salinan aplikasi yang boleh berjalan (kalau tidak, file pemulihan dan jadwal saling menimpa)
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) app.quit();
+app.on('second-instance', () => {
+  if (operatorWin && !operatorWin.isDestroyed()) {
+    if (operatorWin.isMinimized()) operatorWin.restore();
+    operatorWin.focus();
+  }
+});
+
 app.whenReady().then(() => {
+  if (!gotLock) return;
   openScoreboard();
   operatorWin = createWindow('operator.html', { x: 80, y: 60, width: 1100, height: 760 });
+  operatorWin.on('closed', () => app.quit()); // pertandingan tersimpan otomatis dan dipulihkan saat dibuka lagi
   // layar HDMI dicolok / dicabut / berubah resolusi
   const { screen } = require('electron');
   ['display-added', 'display-removed', 'display-metrics-changed'].forEach((ev) => {
