@@ -353,3 +353,7 @@ body.minus .op-head::after { content: '  ·  MODE KURANG'; color: #ffeb3b; }
 
 /* tombol poin teknikal */
 .op-pts button[data-technical] { background: #5e35b1 !important; color: #fff !important; }
+
+/* banner pemulihan pertandingan */
+.restore { display: flex; align-items: center; gap: 12px; background: #1b5e20; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; font-size: 14px; }
+.restore button { margin-left: auto; }

@@ -163,6 +163,12 @@
     </div>
   </div>
 
+  <!-- Banner pemulihan -->
+  <div class="restore" id="restoreBanner" style="display:none">
+    <span id="restoreText"></span>
+    <button id="restoreClose">Tutup</button>
+  </div>
+
   <!-- Kontrol pertandingan -->
   <div class="op-controls">
     <button class="b-start" id="btnStart">▶ Shijak / Kye-sok</button>
@@ -440,6 +446,15 @@
       }
       $('recap').innerHTML = rows;
       $('log').innerHTML = logHTML(st);
+      // banner pemulihan
+      if (st.restoredAt && st.restoredAt !== bannerDismissed) {
+        $('restoreBanner').style.display = '';
+        $('restoreText').textContent = `♻ Pertandingan sebelumnya dipulihkan (${st.chung.name} vs ${st.hong.name}, ronde ${st.round}).` +
+          (st.restoredFrom === 'running' ? ' Jam dikembalikan ke status Kal-yeo, tekan Kye-sok untuk melanjutkan.' : '') +
+          ' Untuk pertandingan baru, klik Match Baru.';
+      } else {
+        $('restoreBanner').style.display = 'none';
+      }
     }
 
     ipcRenderer.invoke('getState').then(render);
@@ -490,6 +505,13 @@
         send('newMatch');
       }
     };
+    // ===== BANNER PEMULIHAN =====
+    let bannerDismissed = 0;
+    $('restoreClose').onclick = () => {
+      if (last) bannerDismissed = last.restoredAt;
+      $('restoreBanner').style.display = 'none';
+    };
+
     // ===== MODE TAMBAH / KURANG =====
     $('btnSign').onclick = () => {
       const on = document.body.classList.toggle('minus');

@@ -118,6 +118,40 @@ function newMatch() {
 }
 let state = newMatch();
 
+// ===== PEMULIHAN OTOMATIS =====
+// Kondisi pertandingan disimpan ke file dan dipulihkan saat aplikasi dibuka lagi.
+const matchFile = path.join(app.getPath('userData'), 'match-state.json');
+let saveTimer = null;
+
+function saveMatchNow() {
+  try {
+    const data = JSON.stringify({ v: 1, savedAt: Date.now(), state: { ...state, settings: undefined, meta: undefined } });
+    fs.writeFileSync(matchFile + '.tmp', data);
+    fs.renameSync(matchFile + '.tmp', matchFile);
+  } catch (e) {}
+}
+function scheduleSave() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => { saveTimer = null; saveMatchNow(); }, 500);
+}
+
+function loadSavedMatch() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(matchFile, 'utf8'));
+    if (!raw || raw.v !== 1 || !raw.state || !Array.isArray(raw.state.events)) return;
+    if (Date.now() - raw.savedAt > 12 * 3600 * 1000) return; // lebih dari 12 jam: anggap sesi baru
+    const restored = Object.assign(newMatch(), raw.state, { settings, meta: META });
+    restored.restoredFrom = restored.phase;
+    if (restored.phase === 'running') restored.phase = 'paused'; // jam tidak langsung jalan
+    if (restored.phase === 'test') restored.phase = 'waiting';
+    restored.restoredAt = Date.now();
+    nextId = restored.events.reduce((m, e) => Math.max(m, e.id), 0) + 1;
+    state = restored;
+  } catch (e) {}
+}
+loadSavedMatch();
+app.on('before-quit', saveMatchNow);
+
 // ===== LOG KEJADIAN & PERHITUNGAN =====
 const other = (s) => (s === 'chung' ? 'hong' : 'chung');
 const cur = () => state.round - 1;
@@ -613,6 +647,7 @@ function createWindow(file, opts = {}) {
 
 function broadcast() {
   for (const w of windows) w.webContents.send('state', state);
+  scheduleSave();
 }
 
 ipcMain.handle('getState', () => state);
