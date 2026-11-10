@@ -18,8 +18,20 @@
           <button id="btnSchedTemplate">📄 Unduh template</button>
           <button class="b-ref" id="btnSchedNext">Berikutnya ▶</button>
           <button id="btnSchedClear">🗑 Hapus yang selesai</button>
+          <button id="btnSchedAdd">➕ Tambah manual</button>
+          <button id="btnSchedDelSel">🗑 Hapus yang dipilih</button>
         </div>
         <div id="schedInfo" class="muted" style="font-size:12px"></div>
+        <div class="sched-form" id="schedForm" style="display:none">
+          <input id="fNo" placeholder="No (otomatis)" size="8">
+          <input id="fCat" placeholder="Kategori, mis. Male -58 kg" size="22">
+          <input id="fChungName" placeholder="Nama Chung (biru)" size="22">
+          <input id="fChungCountry" placeholder="Negara" size="6" maxlength="20">
+          <input id="fHongName" placeholder="Nama Hong (merah)" size="22">
+          <input id="fHongCountry" placeholder="Negara" size="6" maxlength="20">
+          <button class="b-start" id="btnSchedSave">Simpan</button>
+          <button id="btnSchedFormClose">Batal</button>
+        </div>
         <div class="sched-list" id="schedList"></div>
         <h4>Riwayat hasil</h4>
         <div class="row">
@@ -80,6 +92,8 @@
           <label><input id="sGapOn" type="checkbox"> Point gap aktif</label>
           <label>Selisih point gap <input id="sGap" type="number" min="1"></label>
           <label>Poin maksimal / ronde (0 = nonaktif) <input id="sMax" type="number" min="0"></label>
+          <label><input id="sWhistle" type="checkbox"> Peluit saat istirahat selesai</label>
+          <button id="btnWhistleTest">🔊 Tes peluit</button>
           <label>Kuota IVR / pertandingan <input id="sIvr" type="number" min="0"></label>
           <label>Jumlah juri
             <select id="sJudge"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
@@ -167,6 +181,8 @@
         <button data-ivrk="head">3 POINT</button>
         <button data-ivrk="trunk-turn">4 POINT</button>
         <button data-ivrk="head-turn">6 POINT</button>
+        <button data-ivrk="trunk-tech">TEKNIKAL +2</button>
+        <button data-ivrk="head-tech">TEKNIKAL +3</button>
       </div>
       <div class="ivr-row">
         <span>Aksi</span>
@@ -273,7 +289,10 @@
     let ivrReq = 'wasit';
     let adj = { side: null, kind: null, sign: 1 };
     let ivrRes = null; // hasil yang dipilih di panel IVR: 'accept' | 'reject'
-    const POINT_LABEL = { gj: 'Gam-jeom', punch: '1 POINT', trunk: '2 POINT', head: '3 POINT', 'trunk-turn': '4 POINT', 'head-turn': '6 POINT' };
+    const POINT_LABEL = {
+      gj: 'Gam-jeom', punch: '1 POINT', trunk: '2 POINT', head: '3 POINT', 'trunk-turn': '4 POINT', 'head-turn': '6 POINT',
+      'trunk-tech': 'TEKNIKAL +2 (badan)', 'head-tech': 'TEKNIKAL +3 (kepala)',
+    };
 
     // ----- bangun tampilan dua sisi -----
     function sideHTML(s, label) {
@@ -325,7 +344,8 @@
       document.querySelectorAll('[data-req]').forEach((b) => b.classList.toggle('sel', b.dataset.req === ivrReq));
       document.querySelectorAll('[data-ivrres]').forEach((b) => b.classList.toggle('sel', b.dataset.ivrres === ivrRes));
       const corr = adj.side && adj.kind
-        ? adjLabel(adj) + (adj.kind === 'gj' ? ' (atlet yang dikenai Gam-jeom)' : '')
+        ? adjLabel(adj) + (adj.kind === 'gj' ? ' (atlet yang dikenai Gam-jeom)'
+          : adj.kind.endsWith('-tech') ? ' (ke tendangan dasar terakhir)' : '')
         : 'tanpa koreksi';
       $('ivrSel').textContent = !ivrRes ? 'Pilih hasil: ACCEPT atau REJECT, lalu klik Apply.'
         : ivrRes === 'reject' ? 'REJECT: permintaan ditolak (konsekuensi diterapkan otomatis).'
@@ -468,6 +488,7 @@
       setVal('sMax', S.maxPoints || 0);
       setVal('sIvr', S.ivrQuota);
       if (document.activeElement !== $('sGapOn')) $('sGapOn').checked = S.pointGapOn;
+      if (document.activeElement !== $('sWhistle')) $('sWhistle').checked = S.whistleOn !== false;
       if (document.activeElement !== $('sJudge')) $('sJudge').value = String(S.judgeCount);
 
       // log dan rekap
@@ -523,6 +544,7 @@
     $('btnUndo').onclick = () => send('undo');
     $('btnDev').onclick = () => ipcRenderer.send('openDevTest');
     $('btnScoreboard').onclick = () => ipcRenderer.send('openScoreboard');
+    $('btnWhistleTest').onclick = () => send('whistleTest');
     $('btnReverse').onclick = () => send('reverse');
     $('btnFinish').onclick = () => send('finish');
     $('btnReopen').onclick = () => send('reopen');
@@ -546,6 +568,8 @@
     let tourn = { schedule: [], results: [] };
     let armedLoad = null;   // id baris yang menunggu klik kedua (konfirmasi mengganti pertandingan)
     let armedDel = null;    // id baris yang menunggu klik kedua (konfirmasi hapus)
+    let selected = new Set(); // id baris yang dicentang
+    let armedSel = false;   // menunggu klik kedua untuk "Hapus yang dipilih"
     let shownSchedId;       // untuk menandai baris jadwal yang sedang dimuat
 
     function matchInProgress() {
@@ -569,15 +593,21 @@
         ? `${s.length} pertandingan · ${done} selesai`
         : 'Belum ada jadwal. Klik Impor Excel (atau Unduh template untuk contoh formatnya).';
       $('resInfo').textContent = `${tourn.results.length} hasil tersimpan`;
+      selected = new Set([...selected].filter((id) => s.some((r) => r.id === id)));
+      $('btnSchedDelSel').textContent = armedSel ? `Klik lagi: hapus ${selected.size} baris` : `🗑 Hapus yang dipilih (${selected.size})`;
+      $('btnSchedDelSel').disabled = selected.size === 0;
       $('schedList').innerHTML = s.length ? `<table class="op-table">` +
+        `<tr><th><input type="checkbox" data-selall="1" ${s.length && selected.size === s.length ? 'checked' : ''}></th>` +
+        `<th>No</th><th>Kategori</th><th>Pertandingan</th><th>Status</th><th></th></tr>` +
         s.map((r) => {
           const cur = last && last.scheduleId === r.id;
           return `<tr class="${cur ? 'sched-cur' : ''}">` +
+            `<td><input type="checkbox" data-sel="${r.id}" ${selected.has(r.id) ? 'checked' : ''}></td>` +
             `<td>${esc(r.no)}</td><td>${esc(r.category)}</td>` +
             `<td class="l">${esc(r.chungName)} <small>${esc(r.chungCountry)}</small> vs ${esc(r.hongName)} <small>${esc(r.hongCountry)}</small></td>` +
             `<td>${r.status === 'selesai' ? '✔ ' + esc(r.result) : '-'}</td>` +
             `<td><button data-load="${r.id}">${armedLoad === r.id ? 'Klik lagi: ganti pertandingan' : 'Muat'}</button>` +
-            (r.status === 'selesai' ? ` <button data-del="${r.id}">${armedDel === r.id ? 'Klik lagi: hapus' : '🗑 Hapus'}</button>` : '') +
+            ` <button data-del="${r.id}">${armedDel === r.id ? 'Klik lagi: hapus' : '🗑 Hapus'}</button>` +
             `</td></tr>`;
         }).join('') + `</table>` : '';
     }
@@ -597,6 +627,53 @@
       setTimeout(() => { if (armedDel === id) { armedDel = null; renderSchedule(); } }, 3000);
     });
     twoClick($('btnSchedClear'), () => send('delDone'));
+
+    // kotak centang: pilih satu baris / pilih semua
+    $('schedList').addEventListener('change', (e) => {
+      const t = e.target;
+      if (t.dataset.selall) {
+        selected = t.checked ? new Set(tourn.schedule.map((r) => r.id)) : new Set();
+      } else if (t.dataset.sel) {
+        const id = Number(t.dataset.sel);
+        if (t.checked) selected.add(id); else selected.delete(id);
+      } else return;
+      armedSel = false;
+      renderSchedule();
+    });
+    // hapus yang dicentang (dua klik)
+    $('btnSchedDelSel').onclick = () => {
+      if (!selected.size) return;
+      if (!armedSel) {
+        armedSel = true;
+        renderSchedule();
+        setTimeout(() => { armedSel = false; renderSchedule(); }, 3000);
+        return;
+      }
+      armedSel = false;
+      send('delSchedules', { ids: [...selected] });
+      selected = new Set();
+    };
+    // input manual di luar Excel
+    $('btnSchedAdd').onclick = () => {
+      const f = $('schedForm');
+      f.style.display = f.style.display === 'none' ? 'flex' : 'none';
+      if (f.style.display === 'flex') $('fChungName').focus();
+    };
+    $('btnSchedFormClose').onclick = () => { $('schedForm').style.display = 'none'; };
+    $('btnSchedSave').onclick = () => {
+      const chungName = $('fChungName').value.trim();
+      const hongName = $('fHongName').value.trim();
+      if (!chungName || !hongName) return joyFlash('Isi nama Chung dan Hong', 3000);
+      send('addSchedule', {
+        no: $('fNo').value, category: $('fCat').value,
+        chungName, chungCountry: $('fChungCountry').value.toUpperCase(),
+        hongName, hongCountry: $('fHongCountry').value.toUpperCase(),
+      });
+      // kategori dipertahankan untuk input berikutnya; nama dikosongkan
+      ['fNo', 'fChungName', 'fChungCountry', 'fHongName', 'fHongCountry'].forEach((id) => { $(id).value = ''; });
+      $('fChungName').focus();
+      joyFlash('Pertandingan ditambahkan', 2000);
+    };
     $('btnSchedNext').onclick = () => {
       const s = tourn.schedule;
       if (!s.length) return joyFlash('Jadwal masih kosong', 3000);
@@ -656,6 +733,13 @@
       if (ivrRes === 'accept' && !!adj.side !== !!adj.kind) {
         return joyFlash('Lengkapi atlet dan poin, atau kosongkan keduanya', 3000);
       }
+      // teknikal butuh tendangan dasar (badan/kepala) yang belum punya teknikal
+      if (ivrRes === 'accept' && adj.sign > 0 && adj.kind && adj.kind.endsWith('-tech')) {
+        const kind = adj.kind === 'head-tech' ? 'head' : 'trunk';
+        if (!pendingBase(adj.side, kind)) {
+          return joyFlash(`${SIDE[adj.side]}: belum ada tendangan ${kind === 'head' ? 'kepala' : 'badan'} untuk ditambah teknikal. Pilih ${kind === 'head' ? '6' : '4'} POINT untuk tendangan putar penuh.`, 6000);
+        }
+      }
       send('ivrDecide', {
         result: ivrRes,
         requester: ivrReq,
@@ -674,7 +758,7 @@
     }
 
     // ----- pengaturan -----
-    for (const id of ['sRound', 'sRest', 'sGj', 'sGapOn', 'sGap', 'sMax', 'sIvr', 'sJudge']) {
+    for (const id of ['sRound', 'sRest', 'sGj', 'sGapOn', 'sGap', 'sMax', 'sIvr', 'sJudge', 'sWhistle']) {
       $(id).addEventListener('change', () => {
         const q = parseInt($('sIvr').value, 10);
         send('setSettings', {
@@ -682,6 +766,7 @@
           restTime: Math.max(0, Number($('sRest').value) || 0),
           gamjeomLimit: Math.max(1, Number($('sGj').value) || 5),
           pointGapOn: $('sGapOn').checked,
+          whistleOn: $('sWhistle').checked,
           pointGap: Math.max(1, Number($('sGap').value) || 15),
           maxPoints: Math.max(0, parseInt($('sMax').value, 10) || 0),
           ivrQuota: Number.isNaN(q) ? 1 : Math.max(0, q),

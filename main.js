@@ -14,6 +14,7 @@ const settings = {
   pointGap: 15,      // selisih poin per ronde (aturan WT: 15)
   maxPoints: 0,      // batas poin maksimal per ronde (0 = nonaktif): mencapainya = menang ronde
   kyeshiTime: 60,    // detik kyeshi
+  whistleOn: true,   // peluit saat istirahat selesai (ronde berikutnya mulai)
   ivrQuota: 1,       // jatah IVR coach per pertandingan
   judgeCount: 1,     // 1, 2, atau 3 juri (menentukan pemberi suara Woo-se-girok)
   consensusMs: 1000, // jendela waktu konsensus juri (milidetik)
@@ -299,12 +300,12 @@ function pendingBase(side, kind) {
   return null;
 }
 
-function addTechnical(side, kind) {
+function addTechnical(side, kind, note) {
   const base = pendingBase(side, kind);
   if (!base) return false;
   logEvent({
     kind: 'score', side, tech: TECH_BONUS_KEY[kind], pts: TECH_BONUS[kind], base: base.id,
-    note: kind === 'head' ? 'putar kepala' : 'putar badan',
+    note: note || (kind === 'head' ? 'putar kepala' : 'putar badan'),
   });
   return true;
 }
@@ -437,7 +438,9 @@ function applyAdjs(adjs) {
   for (const a of adjs) {
     if (a.sign > 0) {
       if (a.kind === 'gj') addGamjeom(a.side, false, 'Koreksi IVR');
-      else if (TECH[a.kind]) addScore(a.side, a.kind, 'Koreksi IVR');
+      else if (a.kind === 'trunk-tech' || a.kind === 'head-tech') {
+        addTechnical(a.side, a.kind === 'head-tech' ? 'head' : 'trunk', 'Koreksi IVR');
+      } else if (TECH[a.kind]) addScore(a.side, a.kind, 'Koreksi IVR');
     } else {
       const last = [...state.events].reverse().find((e) =>
         e.round === state.round && e.side === a.side &&
@@ -672,21 +675,48 @@ function handle(type, p = {}) {
       state.chung = { name: clean(p.chungName), country: clean(p.chungCountry, 20) };
       state.hong = { name: clean(p.hongName), country: clean(p.hongCountry, 20) };
       break;
+    case 'whistleTest': // tes suara peluit dari Pengaturan
+      sendWhistle();
+      break;
     case 'reverse': // tukar posisi biru/merah di scoreboard dan operator
       settings.reversed = !settings.reversed;
       saveSettings();
       break;
-    case 'delSchedule': { // p = { id } hapus baris jadwal yang sudah selesai
-      const row = tournament.schedule.find((r) => r.id === p.id);
-      if (row && row.status === 'selesai') {
-        tournament.schedule = tournament.schedule.filter((r) => r.id !== p.id);
-        saveTournament();
-        broadcastTournament();
-      }
+    case 'delSchedule': { // p = { id } hapus satu baris jadwal (sudah selesai maupun belum dimainkan)
+      tournament.schedule = tournament.schedule.filter((r) => r.id !== p.id);
+      if (state.scheduleId === p.id) state.scheduleId = null;
+      saveTournament();
+      broadcastTournament();
+      break;
+    }
+    case 'delSchedules': { // p = { ids: [...] } hapus beberapa baris jadwal yang dicentang
+      const ids = new Set(Array.isArray(p.ids) ? p.ids : []);
+      tournament.schedule = tournament.schedule.filter((r) => !ids.has(r.id));
+      if (ids.has(state.scheduleId)) state.scheduleId = null;
+      saveTournament();
+      broadcastTournament();
+      break;
+    }
+    case 'addSchedule': { // p = { no, category, chungName, chungCountry, hongName, hongCountry } input manual
+      const chungName = clean(p.chungName);
+      const hongName = clean(p.hongName);
+      if (!chungName || !hongName) break;
+      const id = tournament.schedule.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+      tournament.schedule.push({
+        id,
+        no: clean(p.no, 20) || String(tournament.schedule.length + 1).padStart(3, '0'),
+        category: clean(p.category),
+        chungName, chungCountry: clean(p.chungCountry, 20),
+        hongName, hongCountry: clean(p.hongCountry, 20),
+        status: 'belum', result: '',
+      });
+      saveTournament();
+      broadcastTournament();
       break;
     }
     case 'delDone': // hapus semua baris jadwal yang sudah selesai
       tournament.schedule = tournament.schedule.filter((r) => r.status !== 'selesai');
+      if (!tournament.schedule.some((r) => r.id === state.scheduleId)) state.scheduleId = null;
       saveTournament();
       broadcastTournament();
       break;
@@ -718,6 +748,7 @@ setInterval(() => {
       state.round++;
       state.phase = 'waiting';
       state.timeLeft = settings.roundTime;
+      if (settings.whistleOn !== false) sendWhistle(); // istirahat selesai: peluit tanda ronde berikutnya
     }
     broadcast();
   } else if (state.phase === 'kyeshi') {
@@ -779,6 +810,11 @@ function createWindow(file, opts = {}) {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.on('closed', () => windows.splice(windows.indexOf(win), 1));
   return win;
+}
+
+// bunyi peluit di scoreboard (istirahat selesai / tes suara)
+function sendWhistle() {
+  for (const w of windows) w.webContents.send('whistle');
 }
 
 function broadcast() {
