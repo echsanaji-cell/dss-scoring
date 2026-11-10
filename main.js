@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+app.commandLine.appendSwitch('log-level', '3'); // sembunyikan pesan log GPU Chromium yang tidak berbahaya
 
 // ===== PENGATURAN (tersimpan di file, tetap ada setelah aplikasi ditutup) =====
 const settingsFile = path.join(app.getPath('userData'), 'settings.json');
@@ -11,6 +12,7 @@ const settings = {
   gamjeomLimit: 5,   // 5 gam-jeom dalam 1 ronde = lawan menang ronde
   pointGapOn: true,
   pointGap: 15,      // selisih poin per ronde (aturan WT: 15)
+  maxPoints: 0,      // batas poin maksimal per ronde (0 = nonaktif): mencapainya = menang ronde
   kyeshiTime: 60,    // detik kyeshi
   ivrQuota: 1,       // jatah IVR coach per pertandingan
   judgeCount: 1,     // 1, 2, atau 3 juri (menentukan pemberi suara Woo-se-girok)
@@ -344,6 +346,11 @@ function checkRound() {
     const gap = state.points.chung[i] - state.points.hong[i];
     if (gap >= settings.pointGap) return endRound('chung');
     if (-gap >= settings.pointGap) return endRound('hong');
+  }
+  if (settings.maxPoints > 0) {
+    const c = state.points.chung[i];
+    const h = state.points.hong[i];
+    if ((c >= settings.maxPoints || h >= settings.maxPoints) && c !== h) return endRound(c > h ? 'chung' : 'hong');
   }
 }
 

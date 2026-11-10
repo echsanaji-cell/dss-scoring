@@ -369,3 +369,11 @@ body.rev .main > .side.hong { order: 1; }
 body.rev .main > :not(.side) { order: 2; }
 body.rev .op-main > .op-side.chung { order: 2; }
 body.rev .op-main > .op-side.hong { order: 1; }
+
+/* panel IVR bergaya dialog KPNP */
+.ivr-head { text-align: center; font-size: 26px; font-weight: 800; padding: 14px; border-radius: 6px; background: #37474f; margin-bottom: 10px; }
+.ivr-head.chung { background: #1565c0; }
+.ivr-head.hong { background: #c62828; }
+.ivr-box { background: #222; border-radius: 8px; padding: 12px; }
+.ivr-actions { justify-content: flex-end; margin-bottom: 0; }
+#btnIvrApply:disabled { opacity: .4; }

@@ -79,6 +79,7 @@
           <label>Batas Gam-jeom / ronde <input id="sGj" type="number" min="1"></label>
           <label><input id="sGapOn" type="checkbox"> Point gap aktif</label>
           <label>Selisih point gap <input id="sGap" type="number" min="1"></label>
+          <label>Poin maksimal / ronde (0 = nonaktif) <input id="sMax" type="number" min="0"></label>
           <label>Kuota IVR / pertandingan <input id="sIvr" type="number" min="0"></label>
           <label>Jumlah juri
             <select id="sJudge"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
@@ -146,40 +147,42 @@
   <!-- Panel IVR / Kartu Teknis -->
   <div class="ivr">
     <div class="ivr-head" id="ivrHead"></div>
-    <div class="ivr-row" id="ivrReq">
-      <span>Pemohon</span>
-      <button class="b-chung" data-req="chung">COACH CHUNG</button>
-      <button class="b-hong" data-req="hong">COACH HONG</button>
-      <button data-req="wasit">WASIT</button>
-    </div>
-    <div class="ivr-row"><span>Alasan</span><select id="ivrReason"></select></div>
-    <div class="ivr-row">
-      <span>Atlet</span>
-      <button class="b-chung" data-ivrp="chung">CHUNG</button>
-      <button class="b-hong" data-ivrp="hong">HONG</button>
-      <small class="muted">Untuk Gam-jeom: pilih atlet yang DIKENAI Gam-jeom</small>
-    </div>
-    <div class="ivr-row">
-      <span>Jenis</span>
-      <button data-ivrk="gj">Gam-jeom</button>
-      <button data-ivrk="punch">1 Pukulan</button>
-      <button data-ivrk="trunk">2 Badan</button>
-      <button data-ivrk="head">3 Kepala</button>
-      <button data-ivrk="trunk-turn">4 Putar badan</button>
-      <button data-ivrk="head-turn">6 Putar kepala</button>
-    </div>
-    <div class="ivr-row">
-      <span>Aksi</span>
-      <button data-ivra="1">TAMBAH [+]</button>
-      <button data-ivra="-1">KURANGI [−]</button>
-      <button id="btnAddAdj">➕ Masukkan ke daftar koreksi</button>
-    </div>
-    <div class="ivr-sel" id="ivrSel"></div>
-    <div class="ivr-list" id="ivrList"></div>
-    <div class="ivr-row">
-      <button class="b-start" id="btnAccept">ACCEPT [O]</button>
-      <button class="b-reject" id="btnReject">REJECT [X]</button>
-      <button id="btnIvrCancel">Batal (salah tekan)</button>
+    <div class="ivr-box">
+      <div class="ivr-row" id="ivrReq">
+        <span>Pemohon</span>
+        <button class="b-chung" data-req="chung">COACH CHUNG</button>
+        <button class="b-hong" data-req="hong">COACH HONG</button>
+        <button data-req="wasit">WASIT</button>
+      </div>
+      <div class="ivr-row">
+        <span>Atlet</span>
+        <button class="b-chung" data-ivrp="chung">CHUNG</button>
+        <button class="b-hong" data-ivrp="hong">HONG</button>
+      </div>
+      <div class="ivr-row">
+        <span>Poin</span>
+        <button data-ivrk="gj">Gam-jeom</button>
+        <button data-ivrk="punch">1 POINT</button>
+        <button data-ivrk="trunk">2 POINT</button>
+        <button data-ivrk="head">3 POINT</button>
+        <button data-ivrk="trunk-turn">4 POINT</button>
+        <button data-ivrk="head-turn">6 POINT</button>
+      </div>
+      <div class="ivr-row">
+        <span>Aksi</span>
+        <button data-ivra="1">ADD [+]</button>
+        <button data-ivra="-1">REMOVE [−]</button>
+      </div>
+      <div class="ivr-row">
+        <span>Hasil</span>
+        <button class="b-start" data-ivrres="accept">ACCEPT [O]</button>
+        <button class="b-reject" data-ivrres="reject">REJECT [X]</button>
+      </div>
+      <div class="ivr-sel" id="ivrSel"></div>
+      <div class="ivr-row ivr-actions">
+        <button class="b-start" id="btnIvrApply">Apply</button>
+        <button id="btnIvrCancel">Close (batal)</button>
+      </div>
     </div>
   </div>
 
@@ -258,7 +261,7 @@
     // jangan bangun ulang DOM kalau isinya sama: elemen yang diganti di tengah klik membuat klik hilang
     (() => {
       const desc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
-      ['log', 'recap', 'ivrList', 'tieTable', 'votes', 'tieConfirm'].forEach((id) => {
+      ['log', 'recap', 'tieTable', 'votes', 'tieConfirm'].forEach((id) => {
         const el = document.getElementById(id);
         Object.defineProperty(el, 'innerHTML', {
           get() { return desc.get.call(this); },
@@ -266,10 +269,11 @@
         });
       });
     })();
-    let lastIvrKind = null;
+
     let ivrReq = 'wasit';
     let adj = { side: null, kind: null, sign: 1 };
-    let adjs = [];
+    let ivrRes = null; // hasil yang dipilih di panel IVR: 'accept' | 'reject'
+    const POINT_LABEL = { gj: 'Gam-jeom', punch: '1 POINT', trunk: '2 POINT', head: '3 POINT', 'trunk-turn': '4 POINT', 'head-turn': '6 POINT' };
 
     // ----- bangun tampilan dua sisi -----
     function sideHTML(s, label) {
@@ -312,19 +316,21 @@
 
     // ----- IVR: pilihan koreksi -----
     function adjLabel(a) {
-      return `${a.sign > 0 ? '+' : '−'} ${a.kind === 'gj' ? 'Gam-jeom' : TECH_NAME[a.kind]} → ${SIDE[a.side]}`;
+      return `${a.sign > 0 ? '+' : '−'} ${POINT_LABEL[a.kind]} → ${SIDE[a.side]}`;
     }
     function showIvrSel() {
       document.querySelectorAll('[data-ivrp]').forEach((b) => b.classList.toggle('sel', b.dataset.ivrp === adj.side));
       document.querySelectorAll('[data-ivrk]').forEach((b) => b.classList.toggle('sel', b.dataset.ivrk === adj.kind));
       document.querySelectorAll('[data-ivra]').forEach((b) => b.classList.toggle('sel', Number(b.dataset.ivra) === adj.sign));
       document.querySelectorAll('[data-req]').forEach((b) => b.classList.toggle('sel', b.dataset.req === ivrReq));
-      $('ivrSel').textContent = adj.side && adj.kind
-        ? 'Koreksi dipilih: ' + adjLabel(adj)
-        : 'Pilih atlet, jenis, dan aksi untuk menambah koreksi (opsional)';
-      $('ivrList').innerHTML = adjs.length
-        ? adjs.map((a, n) => `<span class="chip">${adjLabel(a)} <button data-adjdel="${n}">✕</button></span>`).join('')
-        : '<span class="muted">Belum ada koreksi di daftar</span>';
+      document.querySelectorAll('[data-ivrres]').forEach((b) => b.classList.toggle('sel', b.dataset.ivrres === ivrRes));
+      const corr = adj.side && adj.kind
+        ? adjLabel(adj) + (adj.kind === 'gj' ? ' (atlet yang dikenai Gam-jeom)' : '')
+        : 'tanpa koreksi';
+      $('ivrSel').textContent = !ivrRes ? 'Pilih hasil: ACCEPT atau REJECT, lalu klik Apply.'
+        : ivrRes === 'reject' ? 'REJECT: permintaan ditolak (konsekuensi diterapkan otomatis).'
+        : `ACCEPT · ${corr}`;
+      $('btnIvrApply').disabled = !ivrRes;
     }
 
     // ----- log kejadian -----
@@ -390,16 +396,13 @@
       // panel IVR / kartu teknis
       if (st.phase !== 'ivr') {
         adj = { side: null, kind: null, sign: 1 };
-        adjs = [];
+        ivrRes = null;
         ivrReq = 'wasit';
-        lastIvrKind = null;
       } else {
-        $('ivrHead').textContent = `🎥 ${IVR_NAME[st.ivrKind]}${st.ivrBy ? ' – ' + SIDE[st.ivrBy] : ''}`;
+        $('ivrHead').className = 'ivr-head ' + (st.ivrBy || '');
+        $('ivrHead').textContent = `${st.ivrBy ? SIDE[st.ivrBy] + ' : ' : ''}${IVR_NAME[st.ivrKind].toUpperCase()}`;
         $('ivrReq').style.display = st.ivrKind === 'technical' ? 'flex' : 'none';
-        if (st.ivrKind !== lastIvrKind) {
-          lastIvrKind = st.ivrKind;
-          $('ivrReason').innerHTML = st.meta.ivr[st.ivrKind].map((r) => `<option>${r}</option>`).join('');
-        }
+
       }
       showIvrSel();
 
@@ -462,6 +465,7 @@
       setVal('sRest', S.restTime);
       setVal('sGj', S.gamjeomLimit);
       setVal('sGap', S.pointGap);
+      setVal('sMax', S.maxPoints || 0);
       setVal('sIvr', S.ivrQuota);
       if (document.activeElement !== $('sGapOn')) $('sGapOn').checked = S.pointGapOn;
       if (document.activeElement !== $('sJudge')) $('sJudge').value = String(S.judgeCount);
@@ -506,7 +510,7 @@
       if (b.dataset.ivrk) { adj.kind = b.dataset.ivrk; showIvrSel(); }
       if (b.dataset.ivra) { adj.sign = Number(b.dataset.ivra); showIvrSel(); }
       if (b.dataset.req) { ivrReq = b.dataset.req; showIvrSel(); }
-      if (b.dataset.adjdel) { adjs.splice(Number(b.dataset.adjdel), 1); showIvrSel(); }
+      if (b.dataset.ivrres) { ivrRes = b.dataset.ivrres; showIvrSel(); }
       if (b.dataset.injwin) send('injuryWin', { side: b.dataset.injwin });
       if (b.dataset.voter) send('vote', { voter: Number(b.dataset.voter), side: b.dataset.vside });
       if (b.dataset.confirmtie) send('confirmTie');
@@ -646,26 +650,18 @@
       seconds: (Number($('tMin').value) || 0) * 60 + (Number($('tSec').value) || 0),
     });
 
-    // ----- IVR: masukkan koreksi, accept, reject, batal -----
-    $('btnAddAdj').onclick = () => {
-      if (adj.side && adj.kind) {
-        adjs.push({ ...adj });
-        adj = { side: null, kind: null, sign: adj.sign };
-        showIvrSel();
+    // ----- IVR: Apply (hasil + koreksi) dan batal -----
+    $('btnIvrApply').onclick = () => {
+      if (!ivrRes) return;
+      if (ivrRes === 'accept' && !!adj.side !== !!adj.kind) {
+        return joyFlash('Lengkapi atlet dan poin, atau kosongkan keduanya', 3000);
       }
-    };
-    function ivrDecide(result) {
-      const list = adjs.slice();
-      if (adj.side && adj.kind) list.push({ ...adj }); // koreksi yang sudah dipilih tapi belum dimasukkan
       send('ivrDecide', {
-        result,
-        reason: $('ivrReason').value,
+        result: ivrRes,
         requester: ivrReq,
-        adjs: result === 'accept' ? list : [],
+        adjs: ivrRes === 'accept' && adj.side && adj.kind ? [{ ...adj }] : [],
       });
-    }
-    $('btnAccept').onclick = () => ivrDecide('accept');
-    $('btnReject').onclick = () => ivrDecide('reject');
+    };
     $('btnIvrCancel').onclick = () => send('ivrCancel');
 
     // ----- simpan nama/kategori saat selesai diubah -----
@@ -678,7 +674,7 @@
     }
 
     // ----- pengaturan -----
-    for (const id of ['sRound', 'sRest', 'sGj', 'sGapOn', 'sGap', 'sIvr', 'sJudge']) {
+    for (const id of ['sRound', 'sRest', 'sGj', 'sGapOn', 'sGap', 'sMax', 'sIvr', 'sJudge']) {
       $(id).addEventListener('change', () => {
         const q = parseInt($('sIvr').value, 10);
         send('setSettings', {
@@ -687,6 +683,7 @@
           gamjeomLimit: Math.max(1, Number($('sGj').value) || 5),
           pointGapOn: $('sGapOn').checked,
           pointGap: Math.max(1, Number($('sGap').value) || 15),
+          maxPoints: Math.max(0, parseInt($('sMax').value, 10) || 0),
           ivrQuota: Number.isNaN(q) ? 1 : Math.max(0, q),
           judgeCount: Number($('sJudge').value) || 1,
         });
