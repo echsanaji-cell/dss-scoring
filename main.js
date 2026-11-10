@@ -580,6 +580,13 @@ function handle(type, p = {}) {
       if (live) {
         state.phase = 'kyeshi';
         state.injuryTime = settings.kyeshiTime;
+        state.injuryExtended = false;
+      }
+      break;
+    case 'kyeshiExtend': // dokter minta tambahan waktu: +1 menit (total maksimal 2 menit), satu kali per Kyeshi
+      if (state.phase === 'kyeshi' && !state.injuryExtended) {
+        state.injuryTime += settings.kyeshiTime;
+        state.injuryExtended = true;
       }
       break;
     case 'resume': // selesai kyeshi -> Kal-yeo

@@ -10,6 +10,15 @@
   <!-- Menu: joystick, hasil, pengaturan (kontrol pertandingan ada di bawah, di luar menu) -->
   <div class="menubar">
     <div class="dd">
+      <button id="menuLog">📜 Rekap &amp; Log ▾</button>
+      <div class="menu-panel wide hidden">
+        <h4>Rekap per ronde</h4>
+        <table class="op-table" id="recap"></table>
+        <h4>Log kejadian (✕ = hapus)</h4>
+        <div class="op-log" id="log"></div>
+      </div>
+    </div>
+    <div class="dd">
       <button id="menuSched">📋 Jadwal ▾</button>
       <div class="menu-panel wide hidden">
         <h4>Jadwal pertandingan</h4>
@@ -152,8 +161,9 @@
 
   <!-- Panel Kyeshi / cedera -->
   <div class="inj">
-    <span>Kyeshi berjalan. Atlet bisa lanjut, atau tetapkan pemenang jika tidak bisa lanjut:</span>
+    <span>Kyeshi berjalan (1 menit, dokter boleh minta tambahan sampai total 2 menit). Atlet bisa lanjut, atau tetapkan pemenang jika tidak bisa lanjut:</span>
     <button id="btnResume" class="b-start">LANJUTKAN</button>
+    <button id="btnKyeExtend" class="b-kye">+1 MENIT (DOKTER)</button>
     <button class="b-chung" data-injwin="chung">CHUNG MENANG</button>
     <button class="b-hong" data-injwin="hong">HONG MENANG</button>
   </div>
@@ -231,11 +241,7 @@
     <button id="btnSetTime">Set waktu</button>
   </div>
 
-  <!-- Rekap ronde -->
-  <table class="op-table" id="recap"></table>
 
-  <!-- Log kejadian (✕ = hapus poin / Gam-jeom tertentu) -->
-  <div class="op-log" id="log"></div>
 
   <script>
     const { ipcRenderer } = require('electron');
@@ -404,6 +410,8 @@
       $('phase').textContent = names[st.phase];
       $('round').textContent = 'Ronde ' + st.round;
       $('timer').textContent = fmt(st.phase === 'kyeshi' ? st.injuryTime : st.timeLeft);
+      $('btnKyeExtend').disabled = !!st.injuryExtended;
+      $('btnKyeExtend').textContent = st.injuryExtended ? 'Sudah diperpanjang (maks. 2 menit)' : '+1 MENIT (DOKTER)';
 
       // isi kotak koreksi waktu hanya saat fase/ronde berubah
       const tkey = st.phase + ':' + st.round;
@@ -502,6 +510,7 @@
       }
       $('recap').innerHTML = rows;
       $('log').innerHTML = logHTML(st);
+      $('menuLog').textContent = `📜 Rekap & Log (${st.events.length}) ▾`;
       if (st.scheduleId !== shownSchedId) { shownSchedId = st.scheduleId; renderSchedule(); }
       // banner pemulihan
       if (st.restoredAt && st.restoredAt !== bannerDismissed) {
@@ -550,6 +559,7 @@
     $('btnReopen').onclick = () => send('reopen');
     $('btnKyeshi').onclick = () => send('kyeshi');
     $('btnResume').onclick = () => send('resume');
+    $('btnKyeExtend').onclick = () => send('kyeshiExtend');
     $('btnIvrRef').onclick = () => send('ivr', { kind: 'referee' });
     $('btnTech').onclick = () => send('ivr', { kind: 'technical' });
     let newArmed = false;
