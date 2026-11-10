@@ -144,36 +144,6 @@
     const seenHi = new Set(); // ikon yang sudah pernah tampil menyala
     const hitSig = { chung: '', hong: '' };
 
-    // ===== PELUIT: istirahat selesai / tes suara (dibuat dengan Web Audio, tanpa file audio) =====
-    let audioCtx = null;
-    const BLASTS = [[0, 1.2]]; // [mulai (detik), lama (detik)]; tambah [1.5, 0.6] untuk tiupan kedua
-    function playWhistle() {
-      try {
-        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-        const ctx = audioCtx;
-        if (ctx.state === 'suspended') ctx.resume();
-        const t0 = ctx.currentTime + 0.05;
-        for (const [at, dur] of BLASTS) {
-          const s0 = t0 + at;
-          const o1 = ctx.createOscillator(); // nada utama
-          const o2 = ctx.createOscillator(); // nada kedua yang sedikit berbeda: efek bergetar khas peluit
-          const lfo = ctx.createOscillator(); // getaran cepat (bola di dalam peluit)
-          const lfoGain = ctx.createGain();
-          const gain = ctx.createGain();
-          o1.type = 'sine'; o1.frequency.setValueAtTime(2800, s0); o1.frequency.linearRampToValueAtTime(3000, s0 + dur);
-          o2.type = 'sine'; o2.frequency.setValueAtTime(3080, s0); o2.frequency.linearRampToValueAtTime(3280, s0 + dur);
-          lfo.frequency.value = 28;
-          lfoGain.gain.value = 170;
-          lfo.connect(lfoGain); lfoGain.connect(o1.frequency); lfoGain.connect(o2.frequency);
-          gain.gain.setValueAtTime(0, s0);
-          gain.gain.linearRampToValueAtTime(0.4, s0 + 0.03); // 0.4 = volume (0 sampai 1)
-          gain.gain.setValueAtTime(0.4, s0 + dur - 0.12);
-          gain.gain.linearRampToValueAtTime(0, s0 + dur);
-          o1.connect(gain); o2.connect(gain); gain.connect(ctx.destination);
-          [o1, o2, lfo].forEach((o) => { o.start(s0); o.stop(s0 + dur + 0.05); });
-        }
-      } catch (e) {}
-    }
     ipcRenderer.on('whistle', playWhistle);
 
     function renderHits(st, s) {
@@ -430,17 +400,9 @@
 
     // ===== TOMBOL TES (di jendela scoreboard) =====
     const send = (type, payload) => ipcRenderer.send('cmd', type, payload);
+    // scoreboard hanya punya pintasan tampilan; kontrol pertandingan hanya lewat jendela operator
     const keys = {
-      q: () => send('score', { side: 'chung', tech: 'punch' }),
-      a: () => send('score', { side: 'chung', tech: 'trunk' }),
-      z: () => send('score', { side: 'chung', tech: 'head' }),
-      w: () => send('gj', { side: 'chung', reason: 'umum' }),
-      p: () => send('score', { side: 'hong', tech: 'punch' }),
-      k: () => send('score', { side: 'hong', tech: 'trunk' }),
-      m: () => send('score', { side: 'hong', tech: 'head' }),
-      o: () => send('gj', { side: 'hong', reason: 'umum' }),
       ' ': () => send(last && last.phase === 'running' ? 'pause' : 'start'),
-      n: () => send('newMatch'),
       f: () => ipcRenderer.send('fullscreen'),
       1: () => playWhistle(),
       2: () => playBell(2.2),
