@@ -325,6 +325,11 @@ body[data-phase="timeUp"] .timer { background: #c62828; color: #fff; }
 .joy-warn { color: #fff; background: #c62828; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
 .joy-warn:empty { display: none; }
 
+/* banner: jendela operator tidak fokus (Gamepad API dan keyboard hanya aktif untuk jendela yang fokus) */
+.focus-banner { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 9999; padding: 10px 16px; background: #c62828; color: #fff; font-weight: 800; font-size: 18px; text-align: center; pointer-events: none; animation: focusBlink 1s steps(2, start) infinite; }
+.focus-banner.on { display: block; }
+@keyframes focusBlink { 50% { background: #7f0000; } }
+
 /* ===== MENU DROPDOWN OPERATOR ===== */
 .menubar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
 .dd { position: relative; }

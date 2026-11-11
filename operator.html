@@ -6,6 +6,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="operator" data-phase="waiting">
+  <div id="focusBanner" class="focus-banner">⚠ JENDELA OPERATOR TIDAK AKTIF — joystick dan pintasan keyboard TIDAK TERBACA. Klik jendela ini.</div>
 
   <!-- Menu: joystick, hasil, pengaturan (kontrol pertandingan ada di bawah, di luar menu) -->
   <div class="menubar">
@@ -837,6 +838,10 @@
         }
       }
       $('joyWarn').textContent = warn;
+
+      // banner merah: Gamepad API hanya membaca joystick untuk jendela yang sedang fokus
+      const notFocused = !document.hasFocus() && Object.keys(judgeOf).length > 0 && !(last && last.phase === 'ended');
+      $('focusBanner').classList.toggle('on', notFocused);
     }
 
     function joyFlash(t, ms = 1500) {
@@ -924,6 +929,8 @@
     // pendaftaran juri dipertahankan saat terputus; tersambung lagi di indeks yang sama = otomatis aktif
     window.addEventListener('gamepaddisconnected', () => joyShow());
     window.addEventListener('gamepadconnected', () => joyShow());
+    window.addEventListener('blur', () => setTimeout(joyShow, 50));
+    window.addEventListener('focus', () => setTimeout(joyShow, 50));
     setInterval(pollPads, 15);
     setInterval(joyShow, 500);
     joyShow();
