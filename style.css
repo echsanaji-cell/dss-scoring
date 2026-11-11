@@ -390,6 +390,10 @@ body.rev .main > :not(.side) { order: 2; }
 body.rev .op-main > .op-side.chung { order: 2; }
 body.rev .op-main > .op-side.hong { order: 1; }
 
+/* ikon hit tetap di tepi luar layar: panel kiri = ikon di kiri, panel kanan = ikon di kanan (tidak ikut tukar sisi) */
+body.rev .side.chung .hits { left: auto; right: 1vw; flex-wrap: wrap-reverse; }
+body.rev .side.hong .hits { right: auto; left: 1vw; flex-wrap: wrap; }
+
 /* panel IVR bergaya dialog KPNP */
 .ivr-head { text-align: center; font-size: 26px; font-weight: 800; padding: 14px; border-radius: 6px; background: #37474f; margin-bottom: 10px; }
 .ivr-head.chung { background: #1565c0; }
