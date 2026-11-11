@@ -1,0 +1,54 @@
+name: Build installer
+
+on:
+  workflow_dispatch:      # tombol "Run workflow" manual di GitHub
+  push:
+    tags:
+      - 'v*'              # otomatis jalan kalau ada tag versi, mis. v1.0.1
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false    # kalau satu OS gagal, OS lain tetap lanjut
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist
+            args: ''
+            pattern: dist/*.exe
+            name: installer-windows
+          - os: macos-latest
+            script: dist:mac
+            args: '--x64'   # versi Intel, sama seperti MacBook Anda
+            pattern: dist/*.dmg
+            name: installer-mac
+
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installer
+        run: npm run ${{ matrix.script }} -- ${{ matrix.args }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # Mac: jangan cari sertifikat tanda tangan
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.pattern }}
+          if-no-files-found: error
+          retention-days: 14
