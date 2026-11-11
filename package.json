@@ -16,7 +16,7 @@
   "build": {
     "appId": "id.dss.taekwondo",
     "copyright": "DSS Taekwondo",
-    "artifactName": "DSS-Taekwondo-${version}-${os}.${ext}",
+    "artifactName": "dss-taekwondo.v${version}.${ext}",
     "productName": "DSS Taekwondo",
     "files": [
       "main.js",
