@@ -57,7 +57,10 @@
       </g>
     </defs>
   </svg>
-  <div class="category" id="category"></div>
+  <div class="category">
+    <div id="eventName" class="event-name"></div>
+    <div id="category"></div>
+  </div>
 
   <div class="main">
     <div class="side chung">
@@ -290,6 +293,7 @@
       const i = st.round - 1;
       document.body.dataset.phase = st.phase;
       document.body.classList.toggle('rev', !!(st.settings && st.settings.reversed));
+      $('eventName').textContent = (st.settings && st.settings.eventName) || '';
       $('category').textContent = st.category;
 
       for (const s of ['chung', 'hong']) {

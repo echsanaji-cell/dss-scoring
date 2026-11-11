@@ -18,6 +18,7 @@ const settings = {
   ivrQuota: 1,       // jatah IVR coach per pertandingan
   judgeCount: 1,     // 1, 2, atau 3 juri (menentukan pemberi suara Woo-se-girok)
   consensusMs: 1000, // jendela waktu konsensus juri (milidetik)
+  eventName: '',     // nama event, tampil di scoreboard
 };
 try { Object.assign(settings, JSON.parse(fs.readFileSync(settingsFile, 'utf8'))); } catch (e) {}
 function saveSettings() {
@@ -668,6 +669,7 @@ function handle(type, p = {}) {
     }
 
     case 'setSettings':
+      if ('eventName' in p) p.eventName = clean(p.eventName, 80);
       Object.assign(settings, p);
       saveSettings();
       if (state.phase === 'waiting') {

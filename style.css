@@ -14,12 +14,27 @@ body {
 .category {
   height: 8vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  line-height: 1.15;
   font-size: 3vh;
   font-weight: 600;
   background: #111;
 }
+.event-name {
+  max-width: 96vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 3vh;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #ffd600;
+}
+.event-name:empty { display: none; }
+.event-name:not(:empty) + div { font-size: 2.2vh; opacity: .85; }
 
 .main {
   flex: 1;

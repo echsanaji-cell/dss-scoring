@@ -96,6 +96,7 @@
       <div class="menu-panel hidden">
         <h4>Pengaturan pertandingan</h4>
         <div class="op-settings" id="settings">
+          <label>Nama event <input id="sEvent" type="text" maxlength="80" placeholder="mis. Kejuaraan Terbuka 2026"></label>
           <label>Waktu ronde (detik) <input id="sRound" type="number" min="10"></label>
           <label>Istirahat (detik) <input id="sRest" type="number" min="0"></label>
           <label>Batas Gam-jeom / ronde <input id="sGj" type="number" min="1"></label>
@@ -490,6 +491,7 @@
 
       // pengaturan
       const S = st.settings;
+      setVal('sEvent', S.eventName || '');
       setVal('sRound', S.roundTime);
       setVal('sRest', S.restTime);
       setVal('sGj', S.gamjeomLimit);
@@ -769,10 +771,11 @@
     }
 
     // ----- pengaturan -----
-    for (const id of ['sRound', 'sRest', 'sGj', 'sGapOn', 'sGap', 'sMax', 'sIvr', 'sJudge', 'sWhistle']) {
+    for (const id of ['sEvent', 'sRound', 'sRest', 'sGj', 'sGapOn', 'sGap', 'sMax', 'sIvr', 'sJudge', 'sWhistle']) {
       $(id).addEventListener('change', () => {
         const q = parseInt($('sIvr').value, 10);
         send('setSettings', {
+          eventName: $('sEvent').value,
           roundTime: Math.max(10, Number($('sRound').value) || 120),
           restTime: Math.max(0, Number($('sRest').value) || 0),
           gamjeomLimit: Math.max(1, Number($('sGj').value) || 5),
