@@ -883,10 +883,138 @@ function sanitizeDraw(d) {
 }
 ipcMain.handle('draw:get', () => drawData);
 ipcMain.handle('draw:set', (e, d) => {
+  const uid = drawData.eventUid; // kode event hanya dikelola di main, tidak ditimpa dari jendela
   drawData = Object.assign(drawData, sanitizeDraw(d));
+  if (uid) drawData.eventUid = uid;
   saveDraw();
   return drawData;
 });
+// ===== PAKET ARENA: ekspor dari laptop panitia, impor di laptop arena =====
+function newUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function ensureUid() {
+  if (!drawData.eventUid) { drawData.eventUid = newUid(); saveDraw(); }
+  return drawData.eventUid;
+}
+
+function buildPaket(arena) { // arena 0 = semua arena
+  const ev = drawData.event;
+  const brs = drawData.brackets.filter((b) => b.arena >= 1 && b.arena <= ev.arenas && b.day < ev.days.length && (!arena || b.arena === arena));
+  const ids = new Set(brs.map((b) => b.classId));
+  return {
+    format: 'dss-paket',
+    version: 1,
+    eventUid: ensureUid(),
+    createdAt: Date.now(),
+    arena: arena || 0,
+    eventName: settings.eventName || '',
+    event: ev,
+    classes: drawData.classes.filter((c) => ids.has(c.id)), // urutan kelas dipertahankan (dipakai penomoran)
+    brackets: brs,
+  };
+}
+
+ipcMain.handle('draw:exportPaket', async (e, arena) => {
+  arena = Math.max(0, parseInt(arena, 10) || 0);
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const pk = buildPaket(arena);
+  if (!pk.brackets.length) return { ok: false, msg: 'Belum ada kelas yang dibagi ke ' + (arena ? 'Arena ' + arena : 'arena') + '.' };
+  const r = await dialog.showSaveDialog(parent, {
+    defaultPath: arena ? `Paket-Arena-${arena}.dss.json` : 'Paket-Semua-Arena.dss.json',
+    filters: [{ name: 'Paket DSS', extensions: ['json'] }],
+  });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePath) return { ok: false, msg: '' };
+  try {
+    fs.writeFileSync(r.filePath, JSON.stringify(pk, null, 1));
+    shell.showItemInFolder(r.filePath);
+    const unplaced = drawData.brackets.length - drawData.brackets.filter((b) => b.arena >= 1 && b.arena <= drawData.event.arenas && b.day < drawData.event.days.length).length;
+    return { ok: true, msg: `Paket disimpan: ${pk.brackets.length} kelas.` + (unplaced ? ` ${unplaced} kelas belum dibagi ke arena, tidak ikut.` : '') };
+  } catch (err) {
+    return { ok: false, msg: 'Gagal menyimpan: ' + err.message };
+  }
+});
+
+ipcMain.handle('draw:exportSemuaArena', async (e) => {
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showOpenDialog(parent, { properties: ['openDirectory', 'createDirectory'] });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePaths.length) return { ok: false, msg: '' };
+  try {
+    let files = 0;
+    let kelas = 0;
+    for (let a = 1; a <= drawData.event.arenas; a++) {
+      const pk = buildPaket(a);
+      if (!pk.brackets.length) continue;
+      fs.writeFileSync(path.join(r.filePaths[0], `Paket-Arena-${a}.dss.json`), JSON.stringify(pk, null, 1));
+      files++;
+      kelas += pk.brackets.length;
+    }
+    if (!files) return { ok: false, msg: 'Belum ada kelas yang dibagi ke arena.' };
+    shell.openPath(r.filePaths[0]);
+    const unplaced = drawData.brackets.length - kelas;
+    return { ok: true, msg: `${files} file paket disimpan (${kelas} kelas).` + (unplaced > 0 ? ` ${unplaced} kelas belum dibagi ke arena, tidak ikut.` : '') };
+  } catch (err) {
+    return { ok: false, msg: 'Gagal menyimpan: ' + err.message };
+  }
+});
+
+ipcMain.handle('draw:importPaket', async (e, overwrite) => {
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showOpenDialog(parent, { properties: ['openFile'], filters: [{ name: 'Paket DSS', extensions: ['json'] }] });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePaths.length) return { ok: false, msg: '' };
+  try {
+    const raw = fs.readFileSync(r.filePaths[0], 'utf8');
+    if (raw.length > 20 * 1024 * 1024) return { ok: false, msg: 'File terlalu besar untuk paket DSS.' };
+    const pk = JSON.parse(raw);
+    if (!pk || pk.format !== 'dss-paket' || pk.version !== 1 || !pk.eventUid) return { ok: false, msg: 'Bukan file paket DSS yang valid.' };
+    const uid = clean(pk.eventUid, 40);
+    const empty = !drawData.classes.length && !drawData.brackets.length && !drawData.participants.length;
+    if (!empty && drawData.eventUid !== uid) {
+      return { ok: false, msg: 'Data Drawing di laptop ini berasal dari event lain. Pakai "Hapus semua data Drawing" dulu bila ingin memakai paket ini.' };
+    }
+    const inc = sanitizeDraw({ event: pk.event, classes: pk.classes, participants: [], brackets: pk.brackets, drawLog: [] });
+    if (!inc.brackets.length) return { ok: false, msg: 'Paket tidak berisi bagan yang bisa dibaca.' };
+    drawData.eventUid = uid;
+    drawData.event = inc.event;
+    let added = 0;
+    let replaced = 0;
+    let skipped = 0;
+    for (const b of inc.brackets) {
+      const c = inc.classes.find((x) => x.id === b.classId);
+      if (!c) continue;
+      const has = drawData.brackets.some((x) => x.classId === b.classId);
+      if (has && !overwrite) { skipped++; continue; }
+      if (has) { replaced++; drawData.brackets = drawData.brackets.filter((x) => x.classId !== b.classId); } else added++;
+      drawData.brackets.push(b);
+      const ci = drawData.classes.findIndex((x) => x.id === c.id);
+      if (ci >= 0) drawData.classes[ci] = c; else drawData.classes.push(c);
+    }
+    let msg = `${added} kelas ditambahkan`;
+    if (replaced) msg += `, ${replaced} ditimpa`;
+    if (skipped) msg += `, ${skipped} dilewati (sudah ada; centang "Timpa" bila perlu)`;
+    msg += '.';
+    const evName = clean(pk.eventName, 80);
+    if (evName && evName !== settings.eventName) {
+      settings.eventName = evName;
+      saveSettings();
+      broadcast();
+      msg += ` Nama event diset: ${evName}.`;
+    }
+    drawData.drawLog.push({ t: Date.now(), text: `Impor paket ${pk.arena ? 'Arena ' + pk.arena : 'semua arena'}: ${added} ditambah, ${replaced} ditimpa, ${skipped} dilewati` });
+    saveDraw();
+    return { ok: true, data: drawData, msg };
+  } catch (err) {
+    return { ok: false, msg: 'Gagal membaca paket: ' + err.message };
+  }
+});
+
+ipcMain.handle('draw:reset', () => {
+  drawData = { event: { arenas: 4, days: ['Hari 1'], year: new Date().getFullYear() }, classes: [], participants: [], brackets: [], drawLog: [] };
+  saveDraw();
+  return drawData;
+});
+
 let drawWin = null;
 ipcMain.on('openDraw', () => {
   if (drawWin && !drawWin.isDestroyed()) {

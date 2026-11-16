@@ -41,6 +41,7 @@
     <button class="tab" data-tab="peserta">Peserta</button>
     <button class="tab" data-tab="bagan">Bagan</button>
     <button class="tab" data-tab="arena">Arena &amp; Nomor</button>
+    <button class="tab" data-tab="paket">Paket</button>
   </div>
 
   <!-- TAB EVENT -->
@@ -162,6 +163,26 @@
     </table>
   </section>
 
+  <!-- TAB PAKET -->
+  <section id="tab-paket" hidden>
+    <h2>Ekspor paket arena (laptop panitia)</h2>
+    <div class="row">
+      <label>Arena <select id="pkArena"></select></label>
+      <button id="btnPkExport">📤 Ekspor paket</button>
+      <button id="btnPkAll">📤 Ekspor semua arena (satu file per arena)</button>
+    </div>
+    <p class="muted">Paket berisi bagan, pembagian arena/hari, dan nama event (tanpa tanggal lahir dan berat badan). Salin file ke flashdisk, lalu impor di laptop arena. Hanya kelas yang sudah dibagi ke arena yang ikut.</p>
+    <h2>Impor paket (laptop arena)</h2>
+    <div class="row">
+      <button id="btnPkImport">📥 Impor paket</button>
+      <label><input id="pkOver" type="checkbox" style="width:auto"> Timpa kelas yang sudah ada</label>
+    </div>
+    <div id="pkMsg" class="muted"></div>
+    <h2>Event baru</h2>
+    <div class="row"><button id="btnPkReset" class="danger">Hapus semua data Drawing</button></div>
+    <p class="muted">Untuk memulai event baru, atau mengosongkan laptop arena sebelum mengimpor paket dari event lain. Tidak bisa dibatalkan.</p>
+  </section>
+
 <script>
 const { ipcRenderer } = require('electron');
 const $ = (id) => document.getElementById(id);
@@ -205,7 +226,7 @@ function twoClick(btn, action) {
 document.querySelectorAll('.tab').forEach((b) => {
   b.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === b));
-    for (const name of ['event', 'kelas', 'peserta', 'bagan', 'arena']) $('tab-' + name).hidden = name !== b.dataset.tab;
+    for (const name of ['event', 'kelas', 'peserta', 'bagan', 'arena', 'paket']) $('tab-' + name).hidden = name !== b.dataset.tab;
   });
 });
 
@@ -692,9 +713,10 @@ function renderBracketView() {
     return !p || p.status !== 'lolos' || p.classId !== c.id;
   });
   const warn = [];
+  const cek = data.participants.length > 0; // laptop arena tidak punya daftar peserta, jadi tidak ada yang dicek
   if (b.conflicts) warn.push(`⚠ ${b.conflicts} pertemuan satu kontingen di babak pertama (tidak ditemukan susunan yang menghindarinya).`);
-  if (missing.length) warn.push(`⚠ Lolos setelah undian, belum masuk bagan: ${missing.map((p) => p.name).join(', ')}.`);
-  if (gone.length) warn.push(`⚠ Status atau kelas berubah / dihapus sejak undian: ${gone.map((s) => s.name).join(', ')}.`);
+  if (cek && missing.length) warn.push(`⚠ Lolos setelah undian, belum masuk bagan: ${missing.map((p) => p.name).join(', ')}.`);
+  if (cek && gone.length) warn.push(`⚠ Status atau kelas berubah / dihapus sejak undian: ${gone.map((s) => s.name).join(', ')}.`);
   $('bWarn').textContent = warn.join('  ');
   const nums = numberMatches();
   $('bInfo').textContent += placed(b)
@@ -937,7 +959,31 @@ twoClick($('btnResetAssign'), () => {
   save();
 });
 
-function render() { renderEvent(); renderKelas(); renderPeserta(); renderBagan(); renderArena(); }
+// ===== PAKET ARENA =====
+function renderPaket() {
+  fillSelect($('pkArena'), [[0, 'Semua arena']].concat(Array.from({ length: data.event.arenas }, (_, i) => [i + 1, 'Arena ' + (i + 1)])), $('pkArena').value || 0);
+}
+$('btnPkExport').onclick = async () => {
+  const r = await ipcRenderer.invoke('draw:exportPaket', Number($('pkArena').value) || 0);
+  if (r.msg) $('pkMsg').textContent = r.msg;
+};
+$('btnPkAll').onclick = async () => {
+  const r = await ipcRenderer.invoke('draw:exportSemuaArena');
+  if (r.msg) $('pkMsg').textContent = r.msg;
+};
+$('btnPkImport').onclick = async () => {
+  const r = await ipcRenderer.invoke('draw:importPaket', $('pkOver').checked);
+  if (r.data) { data = r.data; render(); }
+  if (r.msg) $('pkMsg').textContent = r.msg;
+};
+twoClick($('btnPkReset'), async () => {
+  data = await ipcRenderer.invoke('draw:reset');
+  viewClassId = 0;
+  render();
+  $('pkMsg').textContent = 'Semua data Drawing dihapus.';
+});
+
+function render() { renderEvent(); renderKelas(); renderPeserta(); renderBagan(); renderArena(); renderPaket(); }
 
 (async () => {
   data = await ipcRenderer.invoke('draw:get');
