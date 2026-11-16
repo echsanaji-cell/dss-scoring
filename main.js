@@ -873,6 +873,8 @@ function sanitizeDraw(d) {
     size: [2, 4, 8, 16, 32, 64, 128].includes(Number(b.size)) ? Number(b.size) : 0,
     conflicts: Math.max(0, parseInt(b.conflicts, 10) || 0),
     drawnAt: Number(b.drawnAt) || 0,
+    arena: Math.min(20, Math.max(0, parseInt(b.arena, 10) || 0)),
+    day: Math.min(13, Math.max(0, parseInt(b.day, 10) || 0)),
     slots: (Array.isArray(b.slots) ? b.slots : []).slice(0, 128).map((s) => (s && Number(s.id) ? { id: Number(s.id), name: clean(s.name), club: clean(s.club, 40) } : null)),
   })).filter((b) => b.classId && b.size && b.slots.length === b.size);
   const drawLog = (d && Array.isArray(d.drawLog) ? d.drawLog : []).slice(-500)

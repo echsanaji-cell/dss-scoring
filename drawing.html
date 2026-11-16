@@ -20,6 +20,7 @@
   .muted { opacity: .6; font-size: 13px; }
   [hidden] { display: none !important; }
   #tab-bagan table { max-width: 1000px; }
+  #tab-arena table { max-width: 1100px; }
   .bracket-box { margin-top: 8px; overflow: auto; max-height: 70vh; background: #10151b; border-radius: 8px; padding: 12px; }
   #bWarn { white-space: pre-wrap; font-size: 13px; margin: 6px 0; }
   .log { max-width: 1000px; font-size: 13px; line-height: 1.7; opacity: .85; }
@@ -39,6 +40,7 @@
     <button class="tab" data-tab="kelas">Kelas</button>
     <button class="tab" data-tab="peserta">Peserta</button>
     <button class="tab" data-tab="bagan">Bagan</button>
+    <button class="tab" data-tab="arena">Arena &amp; Nomor</button>
   </div>
 
   <!-- TAB EVENT -->
@@ -132,6 +134,34 @@
     <div id="bLog" class="log"></div>
   </section>
 
+  <!-- TAB ARENA & NOMOR -->
+  <section id="tab-arena" hidden>
+    <h2>Pembagian kelas ke arena dan hari</h2>
+    <div class="row">
+      <button id="btnAuto">⚖ Bagi otomatis (yang belum dibagi)</button>
+      <button id="btnResetAssign" class="danger">Reset pembagian</button>
+      <span id="aMsg" class="muted"></span>
+    </div>
+    <p class="muted">Satu kelas bertanding penuh di satu arena dan satu hari. Pembagian otomatis menyeimbangkan jumlah pertandingan; pilihan manual tidak ditimpa. Nomor pertandingan dihitung per hari dan arena, babak demi babak lintas kelas, final di nomor terakhir.</p>
+    <div id="aInfo" class="muted"></div>
+    <table>
+      <thead><tr><th>Kelas</th><th style="width:80px">Peserta</th><th style="width:110px">Pertandingan</th><th style="width:160px">Hari</th><th style="width:200px">Arena</th></tr></thead>
+      <tbody id="aBody"></tbody>
+    </table>
+    <h2>Ringkasan beban</h2>
+    <table><thead id="aSumHead"></thead><tbody id="aSumBody"></tbody></table>
+    <h2>Daftar pertandingan</h2>
+    <div class="row">
+      <label>Hari <select id="aDay"></select></label>
+      <label>Arena <select id="aArena"></select></label>
+      <span id="aCount" class="muted"></span>
+    </div>
+    <table>
+      <thead><tr><th style="width:60px">No</th><th>Kelas</th><th>Babak</th><th>Peserta 1</th><th>Peserta 2</th></tr></thead>
+      <tbody id="aMatches"></tbody>
+    </table>
+  </section>
+
 <script>
 const { ipcRenderer } = require('electron');
 const $ = (id) => document.getElementById(id);
@@ -175,7 +205,7 @@ function twoClick(btn, action) {
 document.querySelectorAll('.tab').forEach((b) => {
   b.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === b));
-    for (const name of ['event', 'kelas', 'peserta', 'bagan']) $('tab-' + name).hidden = name !== b.dataset.tab;
+    for (const name of ['event', 'kelas', 'peserta', 'bagan', 'arena']) $('tab-' + name).hidden = name !== b.dataset.tab;
   });
 });
 
@@ -537,6 +567,9 @@ function drawClass(classId, again) {
   if (!c) return false;
   const r = makeBracket(classId);
   if (r.error) { $('bMsg').textContent = `${c.name}: ${r.error}.`; return false; }
+  const old = data.brackets.find((b) => b.classId === classId);
+  r.bracket.arena = old ? old.arena : 0;
+  r.bracket.day = old ? old.day : 0;
   data.brackets = data.brackets.filter((b) => b.classId !== classId);
   data.brackets.push(r.bracket);
   const n = r.bracket.slots.filter(Boolean).length;
@@ -561,7 +594,7 @@ function roundName(r, rounds) {
   return 'Babak ' + Math.pow(2, left) + ' besar';
 }
 
-function bracketSvg(b) {
+function bracketSvg(b, nums) {
   const S = b.size;
   const rounds = Math.log2(S);
   const BW = 250;
@@ -607,6 +640,11 @@ function bracketSvg(b) {
       const conflict = r === 0 && e1 && e2 && clubKey(e1) && clubKey(e1) === clubKey(e2);
       svg.appendChild(svgEl('rect', { x, y, width: BW, height: BH, rx: 5, fill: '#1f262e', stroke: conflict ? '#ffb74d' : '#455a64', 'stroke-width': conflict ? 2 : 1 }));
       line(x, cy, x + BW, cy, '#37474f');
+      const mm = nums && nums.map.get(`${b.classId}:${r}:${i}`);
+      if (mm) { // badge nomor pertandingan
+        svg.appendChild(svgEl('rect', { x: x + BW - 38, y: y - 9, width: 38, height: 16, rx: 4, fill: '#1565c0' }));
+        svg.appendChild(svgEl('text', { x: x + BW - 19, y: y + 3, fill: '#fff', 'font-size': 11, 'font-weight': 700, 'text-anchor': 'middle' }, '#' + mm.no));
+      }
       [[e1, bye1, y + BH / 4 + 4], [e2, bye2, y + (BH * 3) / 4 + 4]].forEach(([e, isBye, ty]) => {
         const t = svgEl('text', { x: x + 8, y: ty, 'font-size': 13, fill: e ? '#eceff1' : '#78909c', 'font-style': isBye ? 'italic' : 'normal' }, e ? trunc(full(e), 34) : isBye ? 'BYE' : '—');
         if (e) t.appendChild(svgEl('title', {}, full(e)));
@@ -658,7 +696,11 @@ function renderBracketView() {
   if (missing.length) warn.push(`⚠ Lolos setelah undian, belum masuk bagan: ${missing.map((p) => p.name).join(', ')}.`);
   if (gone.length) warn.push(`⚠ Status atau kelas berubah / dihapus sejak undian: ${gone.map((s) => s.name).join(', ')}.`);
   $('bWarn').textContent = warn.join('  ');
-  view.appendChild(bracketSvg(b));
+  const nums = numberMatches();
+  $('bInfo').textContent += placed(b)
+    ? ` · ${data.event.days[b.day]} · Arena ${b.arena}`
+    : ' · belum dibagi ke arena (nomor pertandingan muncul setelah dibagi di tab Arena & Nomor)';
+  view.appendChild(bracketSvg(b, nums));
 }
 
 function renderBagan() {
@@ -717,7 +759,185 @@ $('btnDrawAll').onclick = () => {
   if (done) save();
 };
 
-function render() { renderEvent(); renderKelas(); renderPeserta(); renderBagan(); }
+// ===== ARENA, HARI & NOMOR PERTANDINGAN =====
+// kelas dianggap sudah dibagi bila arena dan hari-nya masih ada di pengaturan Event
+const placed = (b) => b.arena >= 1 && b.arena <= data.event.arenas && b.day >= 0 && b.day < data.event.days.length;
+const nPeserta = (b) => b.slots.filter(Boolean).length;
+
+// pertandingan yang benar-benar dimainkan dalam satu bagan (pasangan babak 1 yang berisi bye dilewati)
+function bracketMatches(b) {
+  const rounds = Math.log2(b.size);
+  const list = [];
+  for (let r = 0; r < rounds; r++) {
+    const count = b.size / Math.pow(2, r + 1);
+    for (let i = 0; i < count; i++) {
+      if (r === 0 && !(b.slots[2 * i] && b.slots[2 * i + 1])) continue;
+      list.push({ classId: b.classId, r, i, rounds, final: r === rounds - 1 });
+    }
+  }
+  return list;
+}
+
+// nomor dihitung ulang dari pembagian yang ada (tidak disimpan):
+// per hari + arena, babak demi babak lintas kelas, final di nomor terakhir
+function numberMatches() {
+  const order = new Map(data.classes.map((c, idx) => [c.id, idx]));
+  const groups = new Map();
+  data.brackets.forEach((b) => {
+    if (!placed(b) || !order.has(b.classId)) return;
+    const key = `${b.day}:${b.arena}`;
+    if (!groups.has(key)) groups.set(key, []);
+    bracketMatches(b).forEach((m) => groups.get(key).push(Object.assign(m, { co: order.get(b.classId), day: b.day, arena: b.arena })));
+  });
+  const map = new Map();
+  groups.forEach((list) => {
+    list.sort((a, c) => (a.final - c.final) || (a.final ? 0 : a.r - c.r) || (a.co - c.co) || (a.i - c.i));
+    list.forEach((m, k) => { m.no = k + 1; map.set(`${m.classId}:${m.r}:${m.i}`, m); });
+  });
+  return { map, groups };
+}
+
+function entryLabels(b, m, nums) {
+  const name = (e) => (e ? (e.club ? `${e.name} · ${e.club}` : e.name) : '—');
+  if (m.r === 0) return [name(b.slots[2 * m.i]), name(b.slots[2 * m.i + 1])];
+  const feeder = (j) => {
+    if (m.r === 1) { // pasangan babak 1 berisi bye: atlet langsung maju
+      const a = b.slots[2 * j];
+      const c = b.slots[2 * j + 1];
+      if (!(a && c)) return name(a || c);
+    }
+    const f = nums.map.get(`${b.classId}:${m.r - 1}:${j}`);
+    return f ? `Pemenang #${f.no}` : '—';
+  };
+  return [feeder(2 * m.i), feeder(2 * m.i + 1)];
+}
+
+function fillSelect(sel, options, current) { // options = [[value, text], ...]
+  sel.textContent = '';
+  for (const [v, t] of options) {
+    const o = document.createElement('option');
+    o.value = String(v);
+    o.textContent = t;
+    sel.appendChild(o);
+  }
+  sel.value = String(current);
+  if (sel.value !== String(current)) sel.value = String(options[0][0]);
+}
+
+function renderArena() {
+  const A = data.event.arenas;
+  const days = data.event.days;
+  const nums = numberMatches();
+  const clsIdx = new Map(data.classes.map((c, idx) => [c.id, idx]));
+  const brs = data.brackets.filter((b) => clsIdx.has(b.classId)).sort((x, y) => clsIdx.get(x.classId) - clsIdx.get(y.classId));
+
+  // tabel pembagian per kelas
+  const body = $('aBody');
+  body.textContent = '';
+  let unplaced = 0;
+  brs.forEach((b) => {
+    const c = data.classes[clsIdx.get(b.classId)];
+    const tr = document.createElement('tr');
+    const td = (txt) => { const e = document.createElement('td'); e.textContent = txt; tr.appendChild(e); return e; };
+    td(c.name);
+    td(nPeserta(b));
+    td(nPeserta(b) - 1);
+    const dayTd = td('');
+    const daySel = document.createElement('select');
+    fillSelect(daySel, days.map((d, i) => [i, d]), b.day);
+    daySel.addEventListener('change', () => { b.day = Number(daySel.value); save(); });
+    dayTd.appendChild(daySel);
+    const arTd = td('');
+    const arSel = document.createElement('select');
+    fillSelect(arSel, [[0, '— Belum dibagi —']].concat(Array.from({ length: A }, (_, i) => [i + 1, 'Arena ' + (i + 1)])), placed(b) ? b.arena : 0);
+    arSel.addEventListener('change', () => { b.arena = Number(arSel.value); save(); });
+    arTd.appendChild(arSel);
+    if (!placed(b)) unplaced++;
+    body.appendChild(tr);
+  });
+  $('aInfo').textContent = brs.length
+    ? (unplaced ? `${unplaced} dari ${brs.length} kelas belum dibagi ke arena.` : `Semua ${brs.length} kelas sudah dibagi.`)
+    : 'Belum ada bagan. Lakukan undian di tab Bagan dulu.';
+
+  // ringkasan beban hari x arena
+  const head = $('aSumHead');
+  head.textContent = '';
+  const hr = document.createElement('tr');
+  ['Hari \\ Arena'].concat(Array.from({ length: A }, (_, i) => 'Arena ' + (i + 1))).forEach((t) => {
+    const th = document.createElement('th');
+    th.textContent = t;
+    hr.appendChild(th);
+  });
+  head.appendChild(hr);
+  const sum = $('aSumBody');
+  sum.textContent = '';
+  days.forEach((d, di) => {
+    const tr = document.createElement('tr');
+    const th = document.createElement('td');
+    th.textContent = d;
+    tr.appendChild(th);
+    for (let a = 1; a <= A; a++) {
+      const td = document.createElement('td');
+      const list = nums.groups.get(`${di}:${a}`) || [];
+      const classes = new Set(list.map((m) => m.classId)).size;
+      td.textContent = list.length ? `${list.length} pertandingan · ${classes} kelas` : '—';
+      tr.appendChild(td);
+    }
+    sum.appendChild(tr);
+  });
+
+  // daftar pertandingan satu hari + arena
+  fillSelect($('aDay'), days.map((d, i) => [i, d]), $('aDay').value || 0);
+  fillSelect($('aArena'), Array.from({ length: A }, (_, i) => [i + 1, 'Arena ' + (i + 1)]), $('aArena').value || 1);
+  const list = nums.groups.get(`${$('aDay').value}:${$('aArena').value}`) || [];
+  $('aCount').textContent = `${list.length} pertandingan`;
+  const mb = $('aMatches');
+  mb.textContent = '';
+  list.forEach((m) => {
+    const b = data.brackets.find((x) => x.classId === m.classId);
+    const c = data.classes.find((x) => x.id === m.classId);
+    const [p1, p2] = entryLabels(b, m, nums);
+    const tr = document.createElement('tr');
+    [m.no, c.name, roundName(m.r, m.rounds), p1, p2].forEach((t) => {
+      const td = document.createElement('td');
+      td.textContent = t;
+      tr.appendChild(td);
+    });
+    mb.appendChild(tr);
+  });
+}
+
+$('aDay').addEventListener('change', renderArena);
+$('aArena').addEventListener('change', renderArena);
+
+// bagi kelas yang belum dibagi: yang pertandingannya terbanyak dulu, ke hari+arena yang bebannya paling ringan
+$('btnAuto').onclick = () => {
+  const A = data.event.arenas;
+  const D = data.event.days.length;
+  const load = Array.from({ length: D * A }, () => 0);
+  data.brackets.forEach((b) => { if (placed(b)) load[b.day * A + (b.arena - 1)] += nPeserta(b) - 1; });
+  const todo = data.brackets
+    .filter((b) => !placed(b) && data.classes.some((c) => c.id === b.classId))
+    .sort((x, y) => nPeserta(y) - nPeserta(x));
+  todo.forEach((b) => {
+    let best = 0;
+    for (let k = 1; k < load.length; k++) if (load[k] < load[best]) best = k;
+    b.day = Math.floor(best / A);
+    b.arena = (best % A) + 1;
+    load[best] += nPeserta(b) - 1;
+  });
+  $('aMsg').textContent = todo.length ? `${todo.length} kelas dibagi otomatis.` : 'Tidak ada kelas yang perlu dibagi.';
+  if (todo.length) { addLog(`Pembagian arena otomatis: ${todo.length} kelas`); save(); }
+};
+
+twoClick($('btnResetAssign'), () => {
+  data.brackets.forEach((b) => { b.arena = 0; b.day = 0; });
+  addLog('Pembagian arena dan hari direset');
+  $('aMsg').textContent = 'Pembagian direset.';
+  save();
+});
+
+function render() { renderEvent(); renderKelas(); renderPeserta(); renderBagan(); renderArena(); }
 
 (async () => {
   data = await ipcRenderer.invoke('draw:get');
