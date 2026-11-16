@@ -91,6 +91,7 @@
       </div>
     </div>
 
+    <button id="menuDraw" class="menu-plain">🏆 Drawing</button>
     <div class="dd">
       <button id="menuSet">⚙ Pengaturan ▾</button>
       <div class="menu-panel hidden">
@@ -555,6 +556,7 @@
     $('btnPause').onclick = () => send('pause');
     $('btnUndo').onclick = () => send('undo');
     $('btnDev').onclick = () => ipcRenderer.send('openDevTest');
+    $('menuDraw').onclick = () => ipcRenderer.send('openDraw');
     $('btnScoreboard').onclick = () => ipcRenderer.send('openScoreboard');
     $('btnWhistleTest').onclick = () => send('whistleTest');
     $('btnReverse').onclick = () => send('reverse');

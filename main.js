@@ -835,6 +835,44 @@ function broadcast() {
 ipcMain.handle('getState', () => state);
 ipcMain.handle('getTournament', () => tournament);
 
+// ===== DRAWING & BAGAN (userData/draw.json, terpisah dari jadwal) =====
+const drawFile = path.join(app.getPath('userData'), 'draw.json');
+let drawData = { event: { arenas: 4, days: ['Hari 1'] }, classes: [] };
+try { drawData = Object.assign(drawData, JSON.parse(fs.readFileSync(drawFile, 'utf8'))); } catch (e) {}
+function saveDraw() {
+  try {
+    fs.writeFileSync(drawFile + '.tmp', JSON.stringify(drawData));
+    fs.renameSync(drawFile + '.tmp', drawFile);
+  } catch (e) {}
+}
+function sanitizeDraw(d) {
+  const ev = (d && d.event) || {};
+  const arenas = Math.min(20, Math.max(1, parseInt(ev.arenas, 10) || 1));
+  const days = (Array.isArray(ev.days) ? ev.days : []).slice(0, 14).map((x) => clean(x, 30)).filter(Boolean);
+  const classes = (d && Array.isArray(d.classes) ? d.classes : []).slice(0, 500).map((c) => ({
+    id: Number(c.id) || 0,
+    name: clean(c.name, 60),
+    gender: clean(c.gender, 10),
+    age: clean(c.age, 20),
+  })).filter((c) => c.id && c.name);
+  return { event: { arenas, days: days.length ? days : ['Hari 1'] }, classes };
+}
+ipcMain.handle('draw:get', () => drawData);
+ipcMain.handle('draw:set', (e, d) => {
+  drawData = Object.assign(drawData, sanitizeDraw(d));
+  saveDraw();
+  return drawData;
+});
+let drawWin = null;
+ipcMain.on('openDraw', () => {
+  if (drawWin && !drawWin.isDestroyed()) {
+    if (drawWin.isMinimized()) drawWin.restore();
+    drawWin.focus();
+    return;
+  }
+  drawWin = createWindow('drawing.html', { width: 1200, height: 800, backgroundColor: '#14181f' });
+});
+
 // impor jadwal dari Excel / CSV
 ipcMain.handle('schedule:import', async (e) => {
   const parent = BrowserWindow.fromWebContents(e.sender);

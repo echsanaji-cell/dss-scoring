@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Drawing &amp; Bagan</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px 28px; background: #14181f; color: #eceff1; font-family: system-ui, "Segoe UI", sans-serif; }
+  h1 { margin: 0 0 14px; font-size: 24px; }
+  h2 { margin: 18px 0 8px; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; opacity: .65; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 6px; padding: 8px 14px; background: #37474f; color: #fff; }
+  button:hover { background: #455a64; }
+  .tab.on { background: #1565c0; }
+  button.danger { background: #8e2b2b; }
+  input, select { font: inherit; padding: 7px 10px; border-radius: 6px; border: 1px solid #455a64; background: #1f262e; color: #fff; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
+  table { border-collapse: collapse; width: 100%; max-width: 760px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #2c3640; }
+  .muted { opacity: .6; font-size: 13px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <h1>🏆 Drawing &amp; Bagan</h1>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="event">Event</button>
+    <button class="tab" data-tab="kelas">Kelas</button>
+  </div>
+
+  <!-- TAB EVENT -->
+  <section id="tab-event">
+    <h2>Arena</h2>
+    <div class="row">
+      <label>Jumlah arena <input id="arenas" type="number" min="1" max="20" style="width:80px"></label>
+    </div>
+    <h2>Hari pertandingan</h2>
+    <div id="days"></div>
+    <div class="row"><button id="btnAddDay">+ Tambah hari</button></div>
+    <p class="muted">Pembagian kelas ke arena dan hari dibuat di langkah berikutnya.</p>
+  </section>
+
+  <!-- TAB KELAS -->
+  <section id="tab-kelas" hidden>
+    <h2>Tambah dari preset WT</h2>
+    <div class="row">
+      <select id="preset"></select>
+      <select id="presetGender">
+        <option value="both">Putra &amp; Putri</option>
+        <option value="M">Putra</option>
+        <option value="F">Putri</option>
+      </select>
+      <button id="btnPreset">Tambah kelas</button>
+    </div>
+    <h2>Tambah manual</h2>
+    <div class="row">
+      <input id="manualName" type="text" maxlength="60" placeholder="mis. Pra-Cadet Putra -30 kg" style="width:320px">
+      <button id="btnManual">Tambah</button>
+    </div>
+    <h2>Daftar kelas (<span id="kelasCount">0 kelas</span>)</h2>
+    <table>
+      <thead><tr><th style="width:50px">No</th><th>Kelas</th><th style="width:130px"></th></tr></thead>
+      <tbody id="kelasBody"></tbody>
+    </table>
+    <div class="row" style="margin-top:12px"><button class="danger" id="btnClearKelas">Hapus semua kelas</button></div>
+  </section>
+
+<script>
+const { ipcRenderer } = require('electron');
+const $ = (id) => document.getElementById(id);
+
+// Kelas berat menurut WT Competition Rules (Pasal 5)
+const PRESETS = {
+  'Senior - 6 kelas': { age: 'Senior', M: [54, 60, 67, 74, 82, '+82'], F: [46, 51, 57, 63, 70, '+70'] },
+  'Senior - 8 kelas': { age: 'Senior', M: [54, 58, 63, 68, 74, 80, 87, '+87'], F: [46, 49, 53, 57, 62, 67, 73, '+73'] },
+  'Junior - 10 kelas': { age: 'Junior', M: [45, 48, 51, 55, 59, 63, 68, 73, 78, '+78'], F: [42, 44, 46, 49, 52, 55, 59, 63, 68, '+68'] },
+  'Cadet - 10 kelas': { age: 'Cadet', M: [33, 37, 41, 45, 49, 53, 57, 61, 65, '+65'], F: [29, 33, 37, 41, 44, 47, 51, 55, 59, '+59'] },
+};
+const fmtW = (w) => (typeof w === 'number' ? `-${w} kg` : `${w} kg`);
+
+let data = { event: { arenas: 4, days: ['Hari 1'] }, classes: [] };
+
+async function save() {
+  data = await ipcRenderer.invoke('draw:set', data);
+  render();
+}
+
+// konfirmasi dua klik (tanpa window.confirm)
+function twoClick(btn, action) {
+  const orig = btn.textContent;
+  let armed = false;
+  let t = null;
+  btn.addEventListener('click', () => {
+    if (!armed) {
+      armed = true;
+      btn.textContent = 'Yakin? klik lagi';
+      t = setTimeout(() => { armed = false; btn.textContent = orig; }, 3000);
+      return;
+    }
+    clearTimeout(t);
+    armed = false;
+    btn.textContent = orig;
+    action();
+  });
+}
+
+// ===== TAB =====
+document.querySelectorAll('.tab').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === b));
+    for (const name of ['event', 'kelas']) $('tab-' + name).hidden = name !== b.dataset.tab;
+  });
+});
+
+// ===== EVENT =====
+function renderEvent() {
+  if (document.activeElement !== $('arenas')) $('arenas').value = data.event.arenas;
+  const box = $('days');
+  box.textContent = '';
+  data.event.days.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.maxLength = 30;
+    inp.value = d;
+    inp.addEventListener('change', () => { data.event.days[i] = inp.value; save(); });
+    const del = document.createElement('button');
+    del.textContent = '✕';
+    del.className = 'danger';
+    del.disabled = data.event.days.length <= 1;
+    twoClick(del, () => { data.event.days.splice(i, 1); save(); });
+    row.append(inp, del);
+    box.appendChild(row);
+  });
+}
+$('arenas').addEventListener('change', () => { data.event.arenas = Number($('arenas').value) || 1; save(); });
+$('btnAddDay').onclick = () => { data.event.days.push('Hari ' + (data.event.days.length + 1)); save(); };
+
+// ===== KELAS =====
+function addClasses(list) { // list = [{ age, gender, name }]
+  const have = new Set(data.classes.map((c) => c.name));
+  let id = data.classes.reduce((m, c) => Math.max(m, c.id), 0);
+  for (const x of list) {
+    if (have.has(x.name)) continue;
+    have.add(x.name);
+    data.classes.push({ id: ++id, name: x.name, gender: x.gender, age: x.age });
+  }
+  save();
+}
+
+function renderKelas() {
+  $('kelasCount').textContent = data.classes.length + ' kelas';
+  const body = $('kelasBody');
+  body.textContent = '';
+  data.classes.forEach((c, i) => {
+    const tr = document.createElement('tr');
+    const t1 = document.createElement('td');
+    t1.textContent = i + 1;
+    const t2 = document.createElement('td');
+    t2.textContent = c.name;
+    const t3 = document.createElement('td');
+    const del = document.createElement('button');
+    del.textContent = '✕';
+    del.className = 'danger';
+    twoClick(del, () => { data.classes = data.classes.filter((x) => x.id !== c.id); save(); });
+    t3.appendChild(del);
+    tr.append(t1, t2, t3);
+    body.appendChild(tr);
+  });
+}
+
+for (const k of Object.keys(PRESETS)) {
+  const o = document.createElement('option');
+  o.value = k;
+  o.textContent = k;
+  $('preset').appendChild(o);
+}
+
+$('btnPreset').onclick = () => {
+  const p = PRESETS[$('preset').value];
+  const g = $('presetGender').value;
+  const list = [];
+  for (const [code, label] of [['M', 'Putra'], ['F', 'Putri']]) {
+    if (g !== 'both' && g !== code) continue;
+    for (const w of p[code]) list.push({ age: p.age, gender: label, name: `${p.age} ${label} ${fmtW(w)}` });
+  }
+  addClasses(list);
+};
+
+$('btnManual').onclick = () => {
+  const name = $('manualName').value.trim();
+  if (!name) return;
+  addClasses([{ age: 'Lainnya', gender: '', name }]);
+  $('manualName').value = '';
+};
+
+twoClick($('btnClearKelas'), () => { data.classes = []; save(); });
+
+function render() { renderEvent(); renderKelas(); }
+
+(async () => {
+  data = await ipcRenderer.invoke('draw:get');
+  render();
+})();
+</script>
+</body>
+</html>

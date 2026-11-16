@@ -349,6 +349,7 @@ body[data-phase="timeUp"] .timer { background: #c62828; color: #fff; }
 .menubar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
 .dd { position: relative; }
 .dd > button { background: #37474f !important; }
+.menubar > .menu-plain { background: #37474f !important; }
 .dd > button.open { background: #546e7a !important; }
 .menu-panel {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 50; min-width: 340px;
