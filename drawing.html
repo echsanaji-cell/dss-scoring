@@ -19,6 +19,16 @@
   th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #2c3640; }
   .muted { opacity: .6; font-size: 13px; }
   [hidden] { display: none !important; }
+  #tab-bagan table { max-width: 1000px; }
+  .bracket-box { margin-top: 8px; overflow: auto; max-height: 70vh; background: #10151b; border-radius: 8px; padding: 12px; }
+  #bWarn { white-space: pre-wrap; font-size: 13px; margin: 6px 0; }
+  .log { max-width: 1000px; font-size: 13px; line-height: 1.7; opacity: .85; }
+  #tab-peserta table { max-width: 1400px; }
+  td input, td select { width: 100%; padding: 5px 8px; }
+  .warn { color: #ffb74d; font-size: 12px; margin-top: 2px; }
+  .age { display: inline-block; min-width: 52px; text-align: center; padding: 5px 8px; border-radius: 6px; background: #10151b; color: #90a4ae; cursor: not-allowed; }
+  tr.st-lolos td:first-child { border-left: 3px solid #2e7d32; }
+  tr.st-tidak_lolos td:first-child, tr.st-tidak_hadir td:first-child { border-left: 3px solid #c62828; }
 </style>
 </head>
 <body>
@@ -27,6 +37,8 @@
   <div class="tabs">
     <button class="tab on" data-tab="event">Event</button>
     <button class="tab" data-tab="kelas">Kelas</button>
+    <button class="tab" data-tab="peserta">Peserta</button>
+    <button class="tab" data-tab="bagan">Bagan</button>
   </div>
 
   <!-- TAB EVENT -->
@@ -34,6 +46,8 @@
     <h2>Arena</h2>
     <div class="row">
       <label>Jumlah arena <input id="arenas" type="number" min="1" max="20" style="width:80px"></label>
+      <label>Tahun pertandingan <input id="eventYear" type="number" min="2000" max="2100" style="width:100px"></label>
+      <span class="muted">dipakai menghitung umur peserta (tahun pertandingan − tahun lahir, sesuai aturan WT)</span>
     </div>
     <h2>Hari pertandingan</h2>
     <div id="days"></div>
@@ -60,10 +74,62 @@
     </div>
     <h2>Daftar kelas (<span id="kelasCount">0 kelas</span>)</h2>
     <table>
-      <thead><tr><th style="width:50px">No</th><th>Kelas</th><th style="width:130px"></th></tr></thead>
+      <thead><tr><th style="width:50px">No</th><th>Kelas</th><th style="width:90px">Peserta</th><th style="width:90px">Lolos</th><th style="width:130px"></th></tr></thead>
       <tbody id="kelasBody"></tbody>
     </table>
     <div class="row" style="margin-top:12px"><button class="danger" id="btnClearKelas">Hapus semua kelas</button></div>
+  </section>
+
+  <!-- TAB PESERTA -->
+  <section id="tab-peserta" hidden>
+    <h2>Impor dari Excel</h2>
+    <div class="row">
+      <button id="btnPTemplate">⬇ Template Excel</button>
+      <button id="btnPImport">📥 Impor Excel</button>
+      <span id="pMsg" class="muted"></span>
+    </div>
+    <p class="muted">Kolom: Nama, Kontingen, Tanggal Lahir, Berat Badan, Kelas (kolom Umur tidak perlu, dihitung otomatis). Nama kelas harus sama dengan di tab Kelas.</p>
+    <h2>Tambah manual</h2>
+    <div class="row">
+      <input id="pName" type="text" maxlength="60" placeholder="Nama atlet" style="width:240px">
+      <input id="pClub" type="text" maxlength="40" placeholder="Kontingen / klub" style="width:200px">
+      <label>Tgl lahir <input id="pBirth" type="date"></label>
+      <span id="pAge" class="age" title="Dihitung otomatis">Umur —</span>
+      <input id="pWeight" type="number" min="1" max="299" step="0.1" placeholder="Berat (kg)" style="width:110px">
+      <select id="pClass"></select>
+      <button id="btnPAdd">Tambah</button>
+    </div>
+    <h2>Daftar peserta (<span id="pCount"></span>)</h2>
+    <div class="row">
+      <label>Filter kelas <select id="pFilter"></select></label>
+      <input id="pSearch" type="text" placeholder="Cari nama / kontingen" style="width:240px">
+      <button id="btnPAllPass">Tandai yang tampil: Lolos</button>
+    </div>
+    <p class="muted">Tombol "Tandai Lolos" hanya mengubah yang masih berstatus Terdaftar.</p>
+    <table>
+      <thead><tr><th style="width:44px">No</th><th>Nama</th><th>Kontingen</th><th style="width:150px">Tgl lahir</th><th style="width:80px">Umur 🔒</th><th style="width:100px">Berat (kg)</th><th>Kelas</th><th style="width:140px">Timbang</th><th style="width:100px"></th></tr></thead>
+      <tbody id="pBody"></tbody>
+    </table>
+  </section>
+
+  <!-- TAB BAGAN -->
+  <section id="tab-bagan" hidden>
+    <h2>Undian per kelas</h2>
+    <div class="row">
+      <button id="btnDrawAll">🎲 Undi semua kelas yang siap</button>
+      <span id="bMsg" class="muted"></span>
+    </div>
+    <p class="muted">Siap = minimal 2 peserta berstatus Lolos dan belum punya bagan. Atlet satu kontingen dipisah di babak pertama bila memungkinkan. Bagan yang sudah diundi terkunci; hanya bisa diubah lewat Undi ulang atau Hapus (dua klik, tercatat di log). Kelas tanpa peserta Lolos tidak ditampilkan.</p>
+    <table>
+      <thead><tr><th>Kelas</th><th style="width:80px">Lolos</th><th>Bagan</th><th style="width:300px"></th></tr></thead>
+      <tbody id="bBody"></tbody>
+    </table>
+    <h2 id="bTitle">Bagan</h2>
+    <div id="bInfo" class="muted"></div>
+    <div id="bWarn" class="warn"></div>
+    <div id="bView" class="bracket-box"></div>
+    <h2>Log undian</h2>
+    <div id="bLog" class="log"></div>
   </section>
 
 <script>
@@ -79,7 +145,7 @@ const PRESETS = {
 };
 const fmtW = (w) => (typeof w === 'number' ? `-${w} kg` : `${w} kg`);
 
-let data = { event: { arenas: 4, days: ['Hari 1'] }, classes: [] };
+let data = { event: { arenas: 4, days: ['Hari 1'], year: new Date().getFullYear() }, classes: [], participants: [], brackets: [], drawLog: [] };
 
 async function save() {
   data = await ipcRenderer.invoke('draw:set', data);
@@ -109,13 +175,14 @@ function twoClick(btn, action) {
 document.querySelectorAll('.tab').forEach((b) => {
   b.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === b));
-    for (const name of ['event', 'kelas']) $('tab-' + name).hidden = name !== b.dataset.tab;
+    for (const name of ['event', 'kelas', 'peserta', 'bagan']) $('tab-' + name).hidden = name !== b.dataset.tab;
   });
 });
 
 // ===== EVENT =====
 function renderEvent() {
   if (document.activeElement !== $('arenas')) $('arenas').value = data.event.arenas;
+  if (document.activeElement !== $('eventYear')) $('eventYear').value = data.event.year;
   const box = $('days');
   box.textContent = '';
   data.event.days.forEach((d, i) => {
@@ -136,6 +203,7 @@ function renderEvent() {
   });
 }
 $('arenas').addEventListener('change', () => { data.event.arenas = Number($('arenas').value) || 1; save(); });
+$('eventYear').addEventListener('change', () => { data.event.year = Number($('eventYear').value) || new Date().getFullYear(); save(); });
 $('btnAddDay').onclick = () => { data.event.days.push('Hari ' + (data.event.days.length + 1)); save(); };
 
 // ===== KELAS =====
@@ -147,6 +215,7 @@ function addClasses(list) { // list = [{ age, gender, name }]
     have.add(x.name);
     data.classes.push({ id: ++id, name: x.name, gender: x.gender, age: x.age });
   }
+  relinkParticipants();
   save();
 }
 
@@ -164,9 +233,20 @@ function renderKelas() {
     const del = document.createElement('button');
     del.textContent = '✕';
     del.className = 'danger';
-    twoClick(del, () => { data.classes = data.classes.filter((x) => x.id !== c.id); save(); });
+    twoClick(del, () => {
+      releaseClass(c.id);
+      if (data.brackets.some((b) => b.classId === c.id)) addLog(`Kelas ${c.name} dihapus beserta baganya`);
+      data.brackets = data.brackets.filter((b) => b.classId !== c.id);
+      data.classes = data.classes.filter((x) => x.id !== c.id);
+      save();
+    });
     t3.appendChild(del);
-    tr.append(t1, t2, t3);
+    const inClass = data.participants.filter((p) => p.classId === c.id);
+    const tReg = document.createElement('td');
+    tReg.textContent = inClass.length;
+    const tOk = document.createElement('td');
+    tOk.textContent = inClass.filter((p) => p.status === 'lolos').length;
+    tr.append(t1, t2, tReg, tOk, t3);
     body.appendChild(tr);
   });
 }
@@ -196,12 +276,455 @@ $('btnManual').onclick = () => {
   $('manualName').value = '';
 };
 
-twoClick($('btnClearKelas'), () => { data.classes = []; save(); });
+twoClick($('btnClearKelas'), () => {
+  data.classes.forEach((c) => releaseClass(c.id));
+  if (data.brackets.length) addLog('Semua kelas dihapus beserta bagannya');
+  data.brackets = [];
+  data.classes = [];
+  save();
+});
 
-function render() { renderEvent(); renderKelas(); }
+// ===== PESERTA =====
+const STATUS = [['daftar', 'Terdaftar'], ['lolos', 'Lolos'], ['tidak_lolos', 'Tidak lolos'], ['tidak_hadir', 'Tidak hadir']];
+const normKelas = (s) => String(s || '').toLowerCase().replace(/[−–—]/g, '-').replace(/[^a-z0-9+-]/g, '');
+
+function releaseClass(id) {
+  const c = data.classes.find((x) => x.id === id);
+  data.participants.forEach((p) => {
+    if (p.classId === id) { p.classId = 0; p.classText = c ? c.name : ''; }
+  });
+}
+
+function relinkParticipants() {
+  const byName = new Map(data.classes.map((c) => [normKelas(c.name), c.id]));
+  data.participants.forEach((p) => {
+    if (p.classId === 0 && p.classText && byName.has(normKelas(p.classText))) {
+      p.classId = byName.get(normKelas(p.classText));
+      p.classText = '';
+    }
+  });
+}
+
+function fillClassSelect(sel, current, first) {
+  sel.textContent = '';
+  for (const [v, t] of first.concat(data.classes.map((c) => [String(c.id), c.name]))) {
+    const o = document.createElement('option');
+    o.value = v;
+    o.textContent = t;
+    sel.appendChild(o);
+  }
+  sel.value = current;
+  if (sel.value !== current) sel.value = first[0][0];
+}
+
+function visiblePeserta() {
+  const f = $('pFilter').value || 'all';
+  const q = $('pSearch').value.trim().toLowerCase();
+  return data.participants.filter((p) => {
+    if (f === 'none' && p.classId !== 0) return false;
+    if (f !== 'all' && f !== 'none' && p.classId !== Number(f)) return false;
+    return !q || (p.name + ' ' + p.contingent).toLowerCase().includes(q);
+  });
+}
+
+// umur dihitung otomatis dari tanggal lahir (selisih tahun, aturan WT); tidak disimpan
+function ageOf(birth) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(birth || '')) return '—';
+  return (data.event.year || new Date().getFullYear()) - Number(birth.slice(0, 4));
+}
+
+function renderPeserta() {
+  fillClassSelect($('pClass'), $('pClass').value || '0', [['0', '— Tanpa kelas —']]);
+  fillClassSelect($('pFilter'), $('pFilter').value || 'all', [['all', 'Semua kelas'], ['none', 'Tanpa kelas']]);
+  const list = visiblePeserta();
+  const lolos = data.participants.filter((p) => p.status === 'lolos').length;
+  $('pCount').textContent = `${list.length} tampil dari ${data.participants.length} · lolos ${lolos}`;
+  const body = $('pBody');
+  body.textContent = '';
+  list.forEach((p, i) => {
+    const tr = document.createElement('tr');
+    tr.className = 'st-' + p.status;
+    const cell = (node) => { const td = document.createElement('td'); td.appendChild(node); tr.appendChild(td); return td; };
+
+    const num = document.createElement('span');
+    num.textContent = i + 1;
+    cell(num);
+
+    const nm = document.createElement('input');
+    nm.type = 'text';
+    nm.maxLength = 60;
+    nm.value = p.name;
+    nm.addEventListener('change', () => { const v = nm.value.trim(); if (v) p.name = v; save(); });
+    cell(nm);
+
+    const ct = document.createElement('input');
+    ct.type = 'text';
+    ct.maxLength = 40;
+    ct.value = p.contingent;
+    ct.addEventListener('change', () => { p.contingent = ct.value.trim(); save(); });
+    cell(ct);
+
+    const bd = document.createElement('input');
+    bd.type = 'date';
+    bd.value = p.birthDate || '';
+    bd.addEventListener('change', () => { p.birthDate = bd.value; save(); });
+    cell(bd);
+
+    const ag = document.createElement('span');
+    ag.className = 'age';
+    ag.title = 'Dihitung otomatis: tahun pertandingan dikurangi tahun lahir';
+    ag.textContent = ageOf(p.birthDate);
+    cell(ag);
+
+    const wt = document.createElement('input');
+    wt.type = 'number';
+    wt.min = 1;
+    wt.max = 299;
+    wt.step = 0.1;
+    wt.value = p.weight || '';
+    wt.addEventListener('change', () => { p.weight = Number(wt.value) || 0; save(); });
+    cell(wt);
+
+    const cl = document.createElement('select');
+    fillClassSelect(cl, String(p.classId), [['0', '— Tanpa kelas —']]);
+    cl.addEventListener('change', () => { p.classId = Number(cl.value) || 0; if (p.classId) p.classText = ''; save(); });
+    const clTd = cell(cl);
+    if (!p.classId && p.classText) {
+      const hint = document.createElement('div');
+      hint.className = 'warn';
+      hint.textContent = 'Excel: ' + p.classText;
+      clTd.appendChild(hint);
+    }
+
+    const st = document.createElement('select');
+    for (const [v, t] of STATUS) {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = t;
+      st.appendChild(o);
+    }
+    st.value = p.status;
+    st.addEventListener('change', () => { p.status = st.value; save(); });
+    cell(st);
+
+    const del = document.createElement('button');
+    del.textContent = '✕';
+    del.className = 'danger';
+    twoClick(del, () => { data.participants = data.participants.filter((x) => x.id !== p.id); save(); });
+    cell(del);
+
+    body.appendChild(tr);
+  });
+}
+
+$('btnPAdd').onclick = () => {
+  const name = $('pName').value.trim();
+  if (!name) return;
+  const id = data.participants.reduce((m, x) => Math.max(m, x.id), 0) + 1;
+  data.participants.push({
+    id, name, contingent: $('pClub').value.trim(), classId: Number($('pClass').value) || 0, classText: '',
+    birthDate: $('pBirth').value, weight: Number($('pWeight').value) || 0, status: 'daftar',
+  });
+  $('pName').value = '';
+  $('pBirth').value = '';
+  $('pWeight').value = '';
+  $('pAge').textContent = 'Umur —';
+  save();
+  $('pName').focus();
+};
+$('pFilter').addEventListener('change', renderPeserta);
+$('pBirth').addEventListener('input', () => { $('pAge').textContent = 'Umur ' + ageOf($('pBirth').value); });
+$('pSearch').addEventListener('input', renderPeserta);
+twoClick($('btnPAllPass'), () => {
+  visiblePeserta().forEach((p) => { if (p.status === 'daftar') p.status = 'lolos'; });
+  save();
+});
+$('btnPTemplate').onclick = () => ipcRenderer.invoke('draw:templatePeserta');
+$('btnPImport').onclick = async () => {
+  const r = await ipcRenderer.invoke('draw:importPeserta');
+  if (r.data) { data = r.data; render(); }
+  $('pMsg').textContent = r.msg || '';
+};
+
+// ===== BAGAN & UNDIAN =====
+let viewClassId = 0;
+const SVGNS = 'http://www.w3.org/2000/svg';
+
+function addLog(text) { data.drawLog.push({ t: Date.now(), text }); }
+
+// urutan unggulan standar, mis. 8 -> 1,8,4,5,2,7,3,6 (bye jatuh ke nomor kecil, tersebar merata)
+function seedOrder(size) {
+  let o = [1];
+  while (o.length < size) { const n = o.length * 2 + 1; o = o.flatMap((x) => [x, n - x]); }
+  return o;
+}
+
+// pengacak dengan kode acak (seed): kode yang sama + peserta yang sama = bagan yang sama
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const clubKey = (x) => String((x && x.club) || '').trim().toLowerCase();
+
+// peserta Lolos di kelas ini, urut id (supaya undian bisa diulang dengan kode acak yang sama)
+function eligible(classId) {
+  return data.participants.filter((p) => p.classId === classId && p.status === 'lolos').sort((a, b) => a.id - b.id);
+}
+
+function makeBracket(classId) {
+  const list = eligible(classId).map((p) => ({ id: p.id, name: p.name, club: p.contingent }));
+  const n = list.length;
+  if (n < 2) return { error: 'minimal 2 peserta berstatus Lolos' };
+  if (n > 128) return { error: 'maksimal 128 peserta per kelas' };
+  let size = 2;
+  while (size < n) size *= 2;
+  const order = seedOrder(size);
+  // jumlah pasangan babak 1 yang berisi dua atlet dari kontingen yang sama
+  const conflicts = (perm) => {
+    let c = 0;
+    for (let i = 0; i < size; i += 2) {
+      const a = perm[order[i] - 1];
+      const b = perm[order[i + 1] - 1];
+      if (a && b && clubKey(a) && clubKey(a) === clubKey(b)) c++;
+    }
+    return c;
+  };
+  const code = Math.floor(Math.random() * 4294967296);
+  const rand = rng(code);
+  let best = null;
+  for (let it = 0; it < 3000; it++) {
+    const perm = list.slice();
+    for (let i = perm.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [perm[i], perm[j]] = [perm[j], perm[i]];
+    }
+    while (perm.length < size) perm.push(null);
+    let c = conflicts(perm);
+    // perbaikan lokal: tukar posisi selama menurunkan jumlah pertemuan satu kontingen
+    for (let pass = 0; c > 0 && pass < 60; pass++) {
+      let improved = false;
+      for (let i = 0; i < size && c > 0; i += 2) {
+        const a = perm[order[i] - 1];
+        const b = perm[order[i + 1] - 1];
+        if (!(a && b && clubKey(a) && clubKey(a) === clubKey(b))) continue;
+        const ia = order[i] - 1;
+        for (let k = 0; k < size; k++) {
+          if (k === ia) continue;
+          [perm[ia], perm[k]] = [perm[k], perm[ia]];
+          const c2 = conflicts(perm);
+          if (c2 < c) { c = c2; improved = true; break; }
+          [perm[ia], perm[k]] = [perm[k], perm[ia]];
+        }
+      }
+      if (!improved) break;
+    }
+    if (!best || c < best.c) best = { perm, c };
+    if (c === 0) break;
+  }
+  const slots = order.map((s) => best.perm[s - 1]);
+  return { bracket: { classId, seed: code, size, conflicts: best.c, drawnAt: Date.now(), slots } };
+}
+
+function drawClass(classId, again) {
+  const c = data.classes.find((x) => x.id === classId);
+  if (!c) return false;
+  const r = makeBracket(classId);
+  if (r.error) { $('bMsg').textContent = `${c.name}: ${r.error}.`; return false; }
+  data.brackets = data.brackets.filter((b) => b.classId !== classId);
+  data.brackets.push(r.bracket);
+  const n = r.bracket.slots.filter(Boolean).length;
+  addLog(`${again ? 'Undian ULANG' : 'Undian'} ${c.name}: ${n} peserta, kode acak ${r.bracket.seed}, pertemuan satu kontingen di babak 1: ${r.bracket.conflicts}`);
+  viewClassId = classId;
+  return true;
+}
+
+// ----- gambar bagan (SVG) -----
+function svgEl(tag, attrs, text) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k of Object.keys(attrs)) e.setAttribute(k, attrs[k]);
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+const trunc = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+function roundName(r, rounds) {
+  const left = rounds - r;
+  if (left === 1) return 'Final';
+  if (left === 2) return 'Semifinal';
+  if (left === 3) return 'Perempat final';
+  return 'Babak ' + Math.pow(2, left) + ' besar';
+}
+
+function bracketSvg(b) {
+  const S = b.size;
+  const rounds = Math.log2(S);
+  const BW = 250;
+  const BH = 44;
+  const GX = 44;
+  const GY = 14;
+  const TOP = 30;
+  const unit = BH + GY;
+  const centers = [Array.from({ length: S / 2 }, (_, i) => TOP + i * unit + BH / 2)];
+  for (let r = 1; r < rounds; r++) {
+    const prev = centers[r - 1];
+    centers.push(Array.from({ length: prev.length / 2 }, (_, i) => (prev[2 * i] + prev[2 * i + 1]) / 2));
+  }
+  const W = rounds * (BW + GX);
+  const H = TOP + (S / 2) * unit;
+  const svg = svgEl('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img' });
+  const line = (x1, y1, x2, y2, col) => svg.appendChild(svgEl('line', { x1, y1, x2, y2, stroke: col || '#546e7a', 'stroke-width': 1.5 }));
+  const full = (e) => (e.club ? `${e.name} · ${e.club}` : e.name);
+  // pemenang otomatis dari pertandingan babak 1 yang salah satu pesertanya bye
+  const auto = (j) => {
+    const a = b.slots[2 * j];
+    const c = b.slots[2 * j + 1];
+    return a && !c ? a : !a && c ? c : null;
+  };
+  for (let r = 0; r < rounds; r++) {
+    const x = r * (BW + GX);
+    svg.appendChild(svgEl('text', { x, y: 18, fill: '#90a4ae', 'font-size': 13, 'font-weight': 600 }, roundName(r, rounds)));
+    centers[r].forEach((cy, i) => {
+      const y = cy - BH / 2;
+      let e1 = null;
+      let e2 = null;
+      let bye1 = false;
+      let bye2 = false;
+      if (r === 0) {
+        e1 = b.slots[2 * i];
+        e2 = b.slots[2 * i + 1];
+        bye1 = !e1;
+        bye2 = !e2;
+      } else if (r === 1) {
+        e1 = auto(2 * i);
+        e2 = auto(2 * i + 1);
+      }
+      const conflict = r === 0 && e1 && e2 && clubKey(e1) && clubKey(e1) === clubKey(e2);
+      svg.appendChild(svgEl('rect', { x, y, width: BW, height: BH, rx: 5, fill: '#1f262e', stroke: conflict ? '#ffb74d' : '#455a64', 'stroke-width': conflict ? 2 : 1 }));
+      line(x, cy, x + BW, cy, '#37474f');
+      [[e1, bye1, y + BH / 4 + 4], [e2, bye2, y + (BH * 3) / 4 + 4]].forEach(([e, isBye, ty]) => {
+        const t = svgEl('text', { x: x + 8, y: ty, 'font-size': 13, fill: e ? '#eceff1' : '#78909c', 'font-style': isBye ? 'italic' : 'normal' }, e ? trunc(full(e), 34) : isBye ? 'BYE' : '—');
+        if (e) t.appendChild(svgEl('title', {}, full(e)));
+        svg.appendChild(t);
+      });
+      // garis penghubung ke babak berikutnya, digambar sekali per pasangan
+      if (r < rounds - 1 && i % 2 === 0) {
+        const x1 = x + BW;
+        const xm = x1 + GX / 2;
+        const sib = centers[r][i + 1];
+        line(x1, cy, xm, cy);
+        line(x1, sib, xm, sib);
+        line(xm, cy, xm, sib);
+        line(xm, (cy + sib) / 2, x1 + GX, (cy + sib) / 2);
+      }
+    });
+  }
+  return svg;
+}
+
+// ----- tampilan tab Bagan -----
+function mkBtn(label, cls, fn, two) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  if (cls) b.className = cls;
+  if (two) twoClick(b, fn); else b.addEventListener('click', fn);
+  return b;
+}
+
+function renderBracketView() {
+  const view = $('bView');
+  view.textContent = '';
+  $('bWarn').textContent = '';
+  $('bInfo').textContent = '';
+  const b = data.brackets.find((x) => x.classId === viewClassId);
+  const c = data.classes.find((x) => x.id === viewClassId);
+  if (!b || !c) { $('bTitle').textContent = 'Bagan'; return; }
+  $('bTitle').textContent = 'Bagan: ' + c.name;
+  const n = b.slots.filter(Boolean).length;
+  $('bInfo').textContent = `${n} peserta · ukuran bagan ${b.size} · ${b.size - n} bye · kode acak ${b.seed} · diundi ${new Date(b.drawnAt).toLocaleString('id-ID')} · TERKUNCI`;
+  const inBracket = new Set(b.slots.filter(Boolean).map((s) => s.id));
+  const missing = eligible(c.id).filter((p) => !inBracket.has(p.id));
+  const gone = b.slots.filter(Boolean).filter((s) => {
+    const p = data.participants.find((x) => x.id === s.id);
+    return !p || p.status !== 'lolos' || p.classId !== c.id;
+  });
+  const warn = [];
+  if (b.conflicts) warn.push(`⚠ ${b.conflicts} pertemuan satu kontingen di babak pertama (tidak ditemukan susunan yang menghindarinya).`);
+  if (missing.length) warn.push(`⚠ Lolos setelah undian, belum masuk bagan: ${missing.map((p) => p.name).join(', ')}.`);
+  if (gone.length) warn.push(`⚠ Status atau kelas berubah / dihapus sejak undian: ${gone.map((s) => s.name).join(', ')}.`);
+  $('bWarn').textContent = warn.join('  ');
+  view.appendChild(bracketSvg(b));
+}
+
+function renderBagan() {
+  const body = $('bBody');
+  body.textContent = '';
+  data.classes.forEach((c) => {
+    const lolos = eligible(c.id).length;
+    const b = data.brackets.find((x) => x.classId === c.id);
+    if (!lolos && !b) return;
+    const tr = document.createElement('tr');
+    const td = (txt) => { const e = document.createElement('td'); e.textContent = txt; tr.appendChild(e); return e; };
+    td(c.name);
+    td(lolos);
+    td(b ? `Terundi (${b.slots.filter(Boolean).length} peserta${b.conflicts ? `, ⚠ ${b.conflicts} satu kontingen` : ''})` : 'Belum diundi');
+    const act = td('');
+    if (!b) {
+      const u = mkBtn('🎲 Undi', '', () => { if (drawClass(c.id, false)) save(); });
+      u.disabled = lolos < 2;
+      act.appendChild(u);
+    } else {
+      act.append(
+        mkBtn('Lihat', '', () => { viewClassId = c.id; renderBracketView(); }),
+        ' ',
+        mkBtn('Undi ulang', 'danger', () => { if (drawClass(c.id, true)) save(); }, true),
+        ' ',
+        mkBtn('Hapus', 'danger', () => {
+          data.brackets = data.brackets.filter((x) => x.classId !== c.id);
+          addLog(`Bagan ${c.name} dihapus`);
+          save();
+        }, true),
+      );
+    }
+    body.appendChild(tr);
+  });
+  renderBracketView();
+  const box = $('bLog');
+  box.textContent = '';
+  data.drawLog.slice(-40).reverse().forEach((x) => {
+    const d = document.createElement('div');
+    d.textContent = `${new Date(x.t).toLocaleString('id-ID')} — ${x.text}`;
+    box.appendChild(d);
+  });
+}
+
+$('btnDrawAll').onclick = () => {
+  let done = 0;
+  let skipped = 0;
+  data.classes.forEach((c) => {
+    if (data.brackets.some((b) => b.classId === c.id)) return;
+    const n = eligible(c.id).length;
+    if (n === 0) return;
+    if (n < 2) { skipped++; return; }
+    if (drawClass(c.id, false)) done++;
+  });
+  $('bMsg').textContent = `${done} kelas diundi.` + (skipped ? ` ${skipped} kelas dilewati (hanya 1 peserta Lolos).` : '');
+  if (done) save();
+};
+
+function render() { renderEvent(); renderKelas(); renderPeserta(); renderBagan(); }
 
 (async () => {
   data = await ipcRenderer.invoke('draw:get');
+  if (!data.participants) data.participants = [];
+  if (!data.event.year) data.event.year = new Date().getFullYear();
+  if (!data.brackets) data.brackets = [];
+  if (!data.drawLog) data.drawLog = [];
   render();
 })();
 </script>

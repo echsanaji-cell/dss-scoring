@@ -837,7 +837,7 @@ ipcMain.handle('getTournament', () => tournament);
 
 // ===== DRAWING & BAGAN (userData/draw.json, terpisah dari jadwal) =====
 const drawFile = path.join(app.getPath('userData'), 'draw.json');
-let drawData = { event: { arenas: 4, days: ['Hari 1'] }, classes: [] };
+let drawData = { event: { arenas: 4, days: ['Hari 1'], year: new Date().getFullYear() }, classes: [], participants: [], brackets: [], drawLog: [] };
 try { drawData = Object.assign(drawData, JSON.parse(fs.readFileSync(drawFile, 'utf8'))); } catch (e) {}
 function saveDraw() {
   try {
@@ -848,6 +848,8 @@ function saveDraw() {
 function sanitizeDraw(d) {
   const ev = (d && d.event) || {};
   const arenas = Math.min(20, Math.max(1, parseInt(ev.arenas, 10) || 1));
+  const yr = parseInt(ev.year, 10);
+  const year = yr >= 2000 && yr <= 2100 ? yr : new Date().getFullYear();
   const days = (Array.isArray(ev.days) ? ev.days : []).slice(0, 14).map((x) => clean(x, 30)).filter(Boolean);
   const classes = (d && Array.isArray(d.classes) ? d.classes : []).slice(0, 500).map((c) => ({
     id: Number(c.id) || 0,
@@ -855,7 +857,27 @@ function sanitizeDraw(d) {
     gender: clean(c.gender, 10),
     age: clean(c.age, 20),
   })).filter((c) => c.id && c.name);
-  return { event: { arenas, days: days.length ? days : ['Hari 1'] }, classes };
+  const participants = (d && Array.isArray(d.participants) ? d.participants : []).slice(0, 5000).map((p) => ({
+    id: Number(p.id) || 0,
+    name: clean(p.name),
+    contingent: clean(p.contingent, 40),
+    classId: Number(p.classId) || 0,
+    classText: clean(p.classText),
+    birthDate: /^\d{4}-\d{2}-\d{2}$/.test(String(p.birthDate)) ? String(p.birthDate) : '',
+    weight: Number(p.weight) > 0 && Number(p.weight) < 300 ? Math.round(Number(p.weight) * 10) / 10 : 0,
+    status: ['daftar', 'lolos', 'tidak_lolos', 'tidak_hadir'].includes(p.status) ? p.status : 'daftar',
+  })).filter((p) => p.id && p.name);
+  const brackets = (d && Array.isArray(d.brackets) ? d.brackets : []).slice(0, 500).map((b) => ({
+    classId: Number(b.classId) || 0,
+    seed: Number(b.seed) >>> 0,
+    size: [2, 4, 8, 16, 32, 64, 128].includes(Number(b.size)) ? Number(b.size) : 0,
+    conflicts: Math.max(0, parseInt(b.conflicts, 10) || 0),
+    drawnAt: Number(b.drawnAt) || 0,
+    slots: (Array.isArray(b.slots) ? b.slots : []).slice(0, 128).map((s) => (s && Number(s.id) ? { id: Number(s.id), name: clean(s.name), club: clean(s.club, 40) } : null)),
+  })).filter((b) => b.classId && b.size && b.slots.length === b.size);
+  const drawLog = (d && Array.isArray(d.drawLog) ? d.drawLog : []).slice(-500)
+    .map((x) => ({ t: Number(x.t) || 0, text: clean(x.text, 200) })).filter((x) => x.text);
+  return { event: { arenas, days: days.length ? days : ['Hari 1'], year }, classes, participants, brackets, drawLog };
 }
 ipcMain.handle('draw:get', () => drawData);
 ipcMain.handle('draw:set', (e, d) => {
@@ -871,6 +893,163 @@ ipcMain.on('openDraw', () => {
     return;
   }
   drawWin = createWindow('drawing.html', { width: 1200, height: 800, backgroundColor: '#14181f' });
+});
+
+// ----- peserta: impor Excel / CSV dan template -----
+const normKelas = (s) => String(s || '').toLowerCase().replace(/[−–—]/g, '-').replace(/[^a-z0-9+-]/g, '');
+
+// tanggal lahir -> 'YYYY-MM-DD' ('' kalau tidak terbaca). Format hari-bulan-tahun; format Amerika tidak ditebak.
+function parseTanggal(v) {
+  const ok = (y, m, d) => {
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    if (y < 1940 || y > new Date().getFullYear() || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return '';
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  };
+  if (v instanceof Date) {
+    if (isNaN(v)) return '';
+    const t = new Date(v.getTime() + 12 * 3600 * 1000); // kebal selisih detik / zona waktu
+    return ok(t.getFullYear(), t.getMonth() + 1, t.getDate());
+  }
+  if (typeof v === 'number') { // nomor seri tanggal Excel
+    if (v < 1000 || v > 80000) return '';
+    const t = new Date(Math.round((v - 25569) * 86400000));
+    return ok(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+  }
+  const s = String(v == null ? '' : v).trim();
+  let m = s.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (m) return ok(+m[1], +m[2], +m[3]);
+  m = s.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{4}|\d{2})\b/);
+  if (m) {
+    let y = +m[3];
+    if (y < 100) y += y <= (new Date().getFullYear() % 100) ? 2000 : 1900;
+    return ok(y, +m[2], +m[1]);
+  }
+  m = s.match(/(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})/);
+  if (m) {
+    const MON = { jan: 1, feb: 2, peb: 2, mar: 3, apr: 4, mei: 5, may: 5, jun: 6, jul: 7, agu: 8, agt: 8, aug: 8, sep: 9, okt: 10, oct: 10, nov: 11, nop: 11, des: 12, dec: 12 };
+    const mo = MON[m[2].toLowerCase().slice(0, 3)];
+    if (mo) return ok(+m[3], mo, +m[1]);
+  }
+  return '';
+}
+function parseBerat(v) {
+  const n = typeof v === 'number' ? v : parseFloat(String(v == null ? '' : v).replace(',', '.').replace(/[^0-9.]/g, ''));
+  return n > 0 && n < 300 ? Math.round(n * 10) / 10 : 0;
+}
+
+function parsePeserta(aoa) {
+  const norm = (s) => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const hi = aoa.findIndex((r) => r.some((c) => String(c).trim() !== ''));
+  if (hi < 0) return { rows: [], error: 'File kosong.' };
+  const idx = {};
+  aoa[hi].forEach((h, i) => {
+    const n = norm(h);
+    if (!n) return;
+    let key = null;
+    if (/kontingen|klub|club|dojang|team|negara|country|sekolah|^tim$/.test(n)) key = 'contingent';
+    else if (/kelas|class|kategori|category|divisi/.test(n)) key = 'cls';
+    else if (/lahir|birth|dob|^ttl$/.test(n)) key = 'birth';
+    else if (/berat|weight|^bb$|^kg$/.test(n)) key = 'weight';
+    else if (/nama|name|atlet|athlete|peserta/.test(n)) key = 'name';
+    if (key && idx[key] === undefined) idx[key] = i;
+  });
+  if (idx.name === undefined) {
+    return { rows: [], error: 'Kolom nama tidak ditemukan. Judul kolom yang terbaca: ' + aoa[hi].filter(Boolean).join(', ') + '. Coba pakai template.' };
+  }
+  const cell = (r, k) => (idx[k] === undefined ? '' : clean(r[idx[k]]));
+  const rows = [];
+  let badDate = 0;
+  aoa.slice(hi + 1).slice(0, 5000).forEach((r) => {
+    const name = cell(r, 'name');
+    if (!name) return;
+    const bd = idx.birth === undefined ? '' : r[idx.birth];
+    const birthDate = parseTanggal(bd);
+    if (!birthDate && String(bd).trim() !== '') badDate++;
+    rows.push({
+      name,
+      contingent: clean(cell(r, 'contingent'), 40),
+      cls: cell(r, 'cls'),
+      birthDate,
+      weight: parseBerat(idx.weight === undefined ? '' : r[idx.weight]),
+    });
+  });
+  return { rows, error: '', badDate };
+}
+
+ipcMain.handle('draw:templatePeserta', async (e) => {
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showSaveDialog(parent, { defaultPath: 'Template-Peserta-DSS.xlsx', filters: [{ name: 'Excel', extensions: ['xlsx'] }] });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePath) return null;
+  try {
+    const XLSX = require('xlsx');
+    const k1 = (drawData.classes[0] && drawData.classes[0].name) || 'Senior Putra -54 kg';
+    const k2 = (drawData.classes[1] && drawData.classes[1].name) || 'Senior Putra -60 kg';
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Nama', 'Kontingen', 'Tanggal Lahir (dd/mm/yyyy)', 'Berat Badan (kg)', 'Kelas'],
+      ['Nama atlet contoh 1', 'Dojang A', '15/03/2008', 53.5, k1],
+      ['Nama atlet contoh 2', 'Dojang B', '02/11/2007', 59, k2],
+    ]);
+    ws['!cols'] = [{ wch: 28 }, { wch: 24 }, { wch: 26 }, { wch: 18 }, { wch: 26 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Peserta');
+    XLSX.writeFile(wb, r.filePath);
+    shell.showItemInFolder(r.filePath);
+    return r.filePath;
+  } catch (err) { return null; }
+});
+
+ipcMain.handle('draw:importPeserta', async (e) => {
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showOpenDialog(parent, {
+    properties: ['openFile'],
+    filters: [{ name: 'Excel / CSV', extensions: ['xlsx', 'xls', 'csv'] }],
+  });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePaths.length) return { ok: false, msg: '' };
+  try {
+    const XLSX = require('xlsx');
+    const isCsv = /\.csv$/i.test(r.filePaths[0]);
+    const wb = XLSX.readFile(r.filePaths[0], isCsv ? { raw: true } : { cellDates: true });
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true });
+    const res = parsePeserta(aoa);
+    if (!res.rows.length) return { ok: false, msg: res.error || 'Tidak ada peserta yang terbaca.' };
+    const byName = new Map(drawData.classes.map((c) => [normKelas(c.name), c.id]));
+    const key = (x) => `${x.name}|${x.contingent}|${x.classId}`.toLowerCase();
+    const have = new Map(drawData.participants.map((x) => [key(x), x]));
+    let id = drawData.participants.reduce((m, x) => Math.max(m, x.id), 0);
+    let added = 0;
+    let dup = 0;
+    let filled = 0;
+    let noClass = 0;
+    for (const x of res.rows) {
+      const classId = byName.get(normKelas(x.cls)) || 0;
+      const rec = { id: 0, name: x.name, contingent: x.contingent, classId, classText: classId ? '' : x.cls, birthDate: x.birthDate, weight: x.weight, status: 'daftar' };
+      const old = have.get(key(rec));
+      if (old) {
+        dup++;
+        // lengkapi data yang masih kosong dari impor ulang
+        let f = false;
+        if (!old.birthDate && rec.birthDate) { old.birthDate = rec.birthDate; f = true; }
+        if (!old.weight && rec.weight) { old.weight = rec.weight; f = true; }
+        if (f) filled++;
+        continue;
+      }
+      rec.id = ++id;
+      have.set(key(rec), rec);
+      drawData.participants.push(rec);
+      added++;
+      if (!classId) noClass++;
+    }
+    saveDraw();
+    let msg = `${added} peserta ditambahkan.`;
+    if (dup) msg += ` ${dup} sudah ada` + (filled ? ` (${filled} dilengkapi datanya).` : ', dilewati.');
+    if (noClass) msg += ` ${noClass} belum punya kelas yang cocok, pilih kelasnya di tabel.`;
+    if (res.badDate) msg += ` ${res.badDate} tanggal lahir tidak terbaca.`;
+    return { ok: true, data: drawData, msg };
+  } catch (err) {
+    return { ok: false, msg: 'Gagal membaca file: ' + err.message };
+  }
 });
 
 // impor jadwal dari Excel / CSV
