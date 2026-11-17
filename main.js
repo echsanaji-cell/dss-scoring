@@ -245,6 +245,7 @@ function syncResult() {
     if (i >= 0) tournament.results[i] = row; else tournament.results.push(row);
     state.recorded = true;
     markSchedule('selesai', `${row.winnerName} (${row.code})`);
+    bracketRecord(row, true);
     saveTournament();
     broadcastTournament();
   } else if (state.recorded) {
@@ -252,6 +253,7 @@ function syncResult() {
     state.recorded = false;
     lastResultJson = '';
     markSchedule('belum', '');
+    bracketRecord(null, false);
     saveTournament();
     broadcastTournament();
   }
@@ -835,6 +837,8 @@ function broadcast() {
 ipcMain.handle('getState', () => state);
 ipcMain.handle('getTournament', () => tournament);
 
+const BR = require('./bracket.js');
+
 // ===== DRAWING & BAGAN (userData/draw.json, terpisah dari jadwal) =====
 const drawFile = path.join(app.getPath('userData'), 'draw.json');
 let drawData = { event: { arenas: 4, days: ['Hari 1'], year: new Date().getFullYear() }, classes: [], participants: [], brackets: [], drawLog: [] };
@@ -875,6 +879,13 @@ function sanitizeDraw(d) {
     drawnAt: Number(b.drawnAt) || 0,
     arena: Math.min(20, Math.max(0, parseInt(b.arena, 10) || 0)),
     day: Math.min(13, Math.max(0, parseInt(b.day, 10) || 0)),
+    wd: (Array.isArray(b.wd) ? b.wd : []).slice(0, 128).map(Number).filter((n) => n > 0),
+    results: Object.fromEntries(Object.entries(b.results && typeof b.results === 'object' ? b.results : {}).slice(0, 200)
+      .filter(([k, v]) => /^\d{1,2}:\d{1,3}$/.test(k) && v && v.winner && Number(v.winner.id))
+      .map(([k, v]) => [k, {
+        winner: { id: Number(v.winner.id), name: clean(v.winner.name), club: clean(v.winner.club, 40) },
+        code: clean(v.code, 8), auto: !!v.auto, at: Number(v.at) || 0,
+      }])),
     slots: (Array.isArray(b.slots) ? b.slots : []).slice(0, 128).map((s) => (s && Number(s.id) ? { id: Number(s.id), name: clean(s.name), club: clean(s.club, 40) } : null)),
   })).filter((b) => b.classId && b.size && b.slots.length === b.size);
   const drawLog = (d && Array.isArray(d.drawLog) ? d.drawLog : []).slice(-500)
@@ -983,8 +994,10 @@ ipcMain.handle('draw:importPaket', async (e, overwrite) => {
     for (const b of inc.brackets) {
       const c = inc.classes.find((x) => x.id === b.classId);
       if (!c) continue;
-      const has = drawData.brackets.some((x) => x.classId === b.classId);
-      if (has && !overwrite) { skipped++; continue; }
+      const cur = drawData.brackets.find((x) => x.classId === b.classId);
+      const has = !!cur;
+      const played = has && cur.results && Object.keys(cur.results).length > 0; // jangan timpa bagan yang sudah ada hasilnya
+      if (has && (!overwrite || played)) { skipped++; continue; }
       if (has) { replaced++; drawData.brackets = drawData.brackets.filter((x) => x.classId !== b.classId); } else added++;
       drawData.brackets.push(b);
       const ci = drawData.classes.findIndex((x) => x.id === c.id);
@@ -1013,6 +1026,81 @@ ipcMain.handle('draw:reset', () => {
   drawData = { event: { arenas: 4, days: ['Hari 1'], year: new Date().getFullYear() }, classes: [], participants: [], brackets: [], drawLog: [] };
   saveDraw();
   return drawData;
+});
+
+// ===== HASIL PERTANDINGAN <-> BAGAN =====
+function notifyDraw() {
+  try { if (drawWin && !drawWin.isDestroyed()) drawWin.webContents.send('draw:changed', drawData); } catch (e) {}
+}
+
+// dipanggil dari syncResult: pertandingan yang dimuat dari bagan dicatat pemenangnya (won = true)
+// atau hasilnya dicabut (won = false, mis. ronde dibuka kembali)
+function bracketRecord(row, won) {
+  try {
+    const sr = tournament.schedule.find((x) => x.id === state.scheduleId);
+    if (!sr || !sr.ref) return;
+    const b = drawData.brackets.find((x) => x.classId === sr.ref.c);
+    if (!b) return;
+    const { r, i } = sr.ref;
+    if (won) {
+      const id = row.winner === 'chung' ? sr.ref.chungId : row.winner === 'hong' ? sr.ref.hongId : 0;
+      const w = BR.entries(b, r, i).find((e) => e && e.id === id);
+      if (!w) return;
+      BR.setResult(b, r, i, w, row.code, false);
+    } else {
+      BR.clearResult(b, r, i);
+    }
+    BR.autoAdvance(b);
+    saveDraw();
+    notifyDraw();
+  } catch (err) {}
+}
+
+const refKey = (ref) => `${ref.c}:${ref.r}:${ref.i}`;
+
+ipcMain.handle('draw:sentKeys', () => tournament.schedule.filter((x) => x.ref).map((x) => refKey(x.ref)));
+
+// kirim pertandingan yang siap dimainkan ke Jadwal (nomor tetap; yang sudah ada dilewati)
+ipcMain.handle('draw:kirimJadwal', (e, rows) => {
+  if (!Array.isArray(rows)) return { added: 0, skipped: 0 };
+  const have = new Set(tournament.schedule.filter((x) => x.ref).map((x) => refKey(x.ref)));
+  let id = tournament.schedule.reduce((m, x) => Math.max(m, x.id), 0);
+  let added = 0;
+  let skipped = 0;
+  for (const x of rows.slice(0, 500)) {
+    if (!x || typeof x !== 'object') continue;
+    const c = Number(x.classId);
+    const r = Number(x.r);
+    const i = Number(x.i);
+    const chungName = clean(x.chungName);
+    const hongName = clean(x.hongName);
+    if (!c || !(r >= 0) || !(i >= 0) || !chungName || !hongName) continue;
+    const ref = { c, r, i, chungId: Number(x.chungId) || 0, hongId: Number(x.hongId) || 0 };
+    if (have.has(refKey(ref))) { skipped++; continue; }
+    have.add(refKey(ref));
+    tournament.schedule.push({
+      id: ++id,
+      no: String(Math.max(0, parseInt(x.no, 10) || 0)).padStart(3, '0'),
+      category: clean(x.category),
+      chungName, chungCountry: clean(x.chungCountry, 20),
+      hongName, hongCountry: clean(x.hongCountry, 20),
+      status: 'belum', result: '',
+      ref,
+    });
+    added++;
+  }
+  if (added) { saveTournament(); broadcastTournament(); }
+  return { added, skipped };
+});
+
+// pertandingan yang sudah diputuskan di bagan (mis. WDR) dicabut dari Jadwal bila belum dimainkan
+ipcMain.handle('draw:cabutJadwal', (e, keys) => {
+  const set = new Set(Array.isArray(keys) ? keys.map(String) : []);
+  const before = tournament.schedule.length;
+  tournament.schedule = tournament.schedule.filter((x) => !(x.ref && x.status === 'belum' && x.id !== state.scheduleId && set.has(refKey(x.ref))));
+  const removed = before - tournament.schedule.length;
+  if (removed) { saveTournament(); broadcastTournament(); }
+  return removed;
 });
 
 let drawWin = null;

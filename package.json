@@ -23,6 +23,8 @@
       "operator.html",
       "scoreboard.html",
       "devtest.html",
+      "drawing.html",
+      "bracket.js",
       "style.css"
     ],
     "win": {

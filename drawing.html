@@ -131,6 +131,11 @@
     <div id="bInfo" class="muted"></div>
     <div id="bWarn" class="warn"></div>
     <div id="bView" class="bracket-box"></div>
+    <h2>Peserta bagan</h2>
+    <table>
+      <thead><tr><th style="width:44px">No</th><th>Nama</th><th>Kontingen</th><th>Status</th><th style="width:210px"></th></tr></thead>
+      <tbody id="bAtlet"></tbody>
+    </table>
     <h2>Log undian</h2>
     <div id="bLog" class="log"></div>
   </section>
@@ -156,9 +161,10 @@
       <label>Hari <select id="aDay"></select></label>
       <label>Arena <select id="aArena"></select></label>
       <span id="aCount" class="muted"></span>
+      <button id="btnKirim">📋 Kirim yang siap ke Jadwal</button>
     </div>
     <table>
-      <thead><tr><th style="width:60px">No</th><th>Kelas</th><th>Babak</th><th>Peserta 1</th><th>Peserta 2</th></tr></thead>
+      <thead><tr><th style="width:60px">No</th><th>Kelas</th><th>Babak</th><th>Peserta 1</th><th>Peserta 2</th><th style="width:190px">Status</th><th style="width:210px">Aksi</th></tr></thead>
       <tbody id="aMatches"></tbody>
     </table>
   </section>
@@ -185,6 +191,7 @@
 
 <script>
 const { ipcRenderer } = require('electron');
+const BR = require('./bracket.js');
 const $ = (id) => document.getElementById(id);
 
 // Kelas berat menurut WT Competition Rules (Pasal 5)
@@ -645,29 +652,23 @@ function bracketSvg(b, nums) {
     svg.appendChild(svgEl('text', { x, y: 18, fill: '#90a4ae', 'font-size': 13, 'font-weight': 600 }, roundName(r, rounds)));
     centers[r].forEach((cy, i) => {
       const y = cy - BH / 2;
-      let e1 = null;
-      let e2 = null;
-      let bye1 = false;
-      let bye2 = false;
-      if (r === 0) {
-        e1 = b.slots[2 * i];
-        e2 = b.slots[2 * i + 1];
-        bye1 = !e1;
-        bye2 = !e2;
-      } else if (r === 1) {
-        e1 = auto(2 * i);
-        e2 = auto(2 * i + 1);
-      }
+      const [e1, e2] = BR.entries(b, r, i);
+      const bye1 = r === 0 && !e1;
+      const bye2 = r === 0 && !e2;
+      const res = b.results && b.results[BR.key(r, i)];
       const conflict = r === 0 && e1 && e2 && clubKey(e1) && clubKey(e1) === clubKey(e2);
       svg.appendChild(svgEl('rect', { x, y, width: BW, height: BH, rx: 5, fill: '#1f262e', stroke: conflict ? '#ffb74d' : '#455a64', 'stroke-width': conflict ? 2 : 1 }));
       line(x, cy, x + BW, cy, '#37474f');
+      if (res && res.code) svg.appendChild(svgEl('text', { x: x + BW - 6, y: cy + 4, 'text-anchor': 'end', 'font-size': 10, fill: '#90a4ae' }, res.code));
       const mm = nums && nums.map.get(`${b.classId}:${r}:${i}`);
       if (mm) { // badge nomor pertandingan
         svg.appendChild(svgEl('rect', { x: x + BW - 38, y: y - 9, width: 38, height: 16, rx: 4, fill: '#1565c0' }));
         svg.appendChild(svgEl('text', { x: x + BW - 19, y: y + 3, fill: '#fff', 'font-size': 11, 'font-weight': 700, 'text-anchor': 'middle' }, '#' + mm.no));
       }
       [[e1, bye1, y + BH / 4 + 4], [e2, bye2, y + (BH * 3) / 4 + 4]].forEach(([e, isBye, ty]) => {
-        const t = svgEl('text', { x: x + 8, y: ty, 'font-size': 13, fill: e ? '#eceff1' : '#78909c', 'font-style': isBye ? 'italic' : 'normal' }, e ? trunc(full(e), 34) : isBye ? 'BYE' : '—');
+        const isWin = res && e && res.winner.id === e.id;
+        const isLose = res && e && res.winner.id !== e.id;
+        const t = svgEl('text', { x: x + 8, y: ty, 'font-size': 13, fill: isWin ? '#81c784' : isLose ? '#78909c' : e ? '#eceff1' : '#78909c', 'font-weight': isWin ? 700 : 400, 'font-style': isBye ? 'italic' : 'normal' }, e ? trunc(full(e), 34) : isBye ? 'BYE' : '—');
         if (e) t.appendChild(svgEl('title', {}, full(e)));
         svg.appendChild(t);
       });
@@ -702,7 +703,7 @@ function renderBracketView() {
   $('bInfo').textContent = '';
   const b = data.brackets.find((x) => x.classId === viewClassId);
   const c = data.classes.find((x) => x.id === viewClassId);
-  if (!b || !c) { $('bTitle').textContent = 'Bagan'; return; }
+  if (!b || !c) { $('bTitle').textContent = 'Bagan'; $('bAtlet').textContent = ''; return; }
   $('bTitle').textContent = 'Bagan: ' + c.name;
   const n = b.slots.filter(Boolean).length;
   $('bInfo').textContent = `${n} peserta · ukuran bagan ${b.size} · ${b.size - n} bye · kode acak ${b.seed} · diundi ${new Date(b.drawnAt).toLocaleString('id-ID')} · TERKUNCI`;
@@ -723,6 +724,7 @@ function renderBracketView() {
     ? ` · ${data.event.days[b.day]} · Arena ${b.arena}`
     : ' · belum dibagi ke arena (nomor pertandingan muncul setelah dibagi di tab Arena & Nomor)';
   view.appendChild(bracketSvg(b, nums));
+  renderAtlet(b);
 }
 
 function renderBagan() {
@@ -925,6 +927,35 @@ function renderArena() {
       td.textContent = t;
       tr.appendChild(td);
     });
+    const [e1, e2] = BR.entries(b, m.r, m.i);
+    if (e1) tr.children[3].textContent = e1.club ? `${e1.name} · ${e1.club}` : e1.name;
+    if (e2) tr.children[4].textContent = e2.club ? `${e2.name} · ${e2.club}` : e2.name;
+    const res = b.results && b.results[BR.key(m.r, m.i)];
+    const wd = b.wd || [];
+    const ready = !!(e1 && e2) && !wd.includes(e1.id) && !wd.includes(e2.id);
+    const stTd = document.createElement('td');
+    const acTd = document.createElement('td');
+    if (res) {
+      stTd.textContent = (res.auto ? 'Menang WDR: ' : 'Selesai: ') + res.winner.name + (res.code && !res.auto ? ` (${res.code})` : '');
+      acTd.appendChild(mkBtn('Koreksi', 'danger', () => {
+        if (!BR.clearResult(b, m.r, m.i)) { $('aMsg').textContent = 'Tidak bisa dicabut: pertandingan berikutnya sudah ada hasilnya.'; return; }
+        BR.autoAdvance(b);
+        addLog(`Hasil dicabut: ${c.name} #${m.no}`);
+        save();
+      }, true));
+    } else {
+      stTd.textContent = !(e1 && e2) ? 'Menunggu pemenang' : !ready ? 'Peserta mundur, putuskan manual' : sentSet.has(`${m.classId}:${m.r}:${m.i}`) ? 'Di Jadwal' : 'Siap dikirim';
+      if (e1 && e2) {
+        [[e1, 'P1'], [e2, 'P2']].forEach(([e, lbl]) => acTd.appendChild(mkBtn(`${lbl} menang`, '', () => {
+          BR.setResult(b, m.r, m.i, e, 'MAN', false);
+          BR.autoAdvance(b);
+          addLog(`Hasil manual: ${c.name} #${m.no}, pemenang ${e.name}`);
+          cabutDariJadwal(b);
+          save();
+        }, true)));
+      }
+    }
+    tr.append(stTd, acTd);
     mb.appendChild(tr);
   });
 }
@@ -983,7 +1014,98 @@ twoClick($('btnPkReset'), async () => {
   $('pkMsg').textContent = 'Semua data Drawing dihapus.';
 });
 
-function render() { renderEvent(); renderKelas(); renderPeserta(); renderBagan(); renderArena(); renderPaket(); }
+// ===== HASIL, PEMENANG, WDR & KIRIM KE JADWAL =====
+const ATAS_ADALAH = 'chung'; // peserta di posisi atas bagan = Chung (biru), bawah = Hong (merah); ganti 'hong' untuk membalik
+let sentSet = new Set();
+
+// pertandingan mana yang sudah ada di Jadwal (diambil dari main.js)
+async function refreshSent() {
+  const next = new Set(await ipcRenderer.invoke('draw:sentKeys'));
+  if (next.size !== sentSet.size || [...next].some((k) => !sentSet.has(k))) { sentSet = next; renderArena(); }
+}
+
+// pertandingan yang sudah diputuskan di bagan (WDR, hasil manual) dicabut dari Jadwal bila belum dimainkan
+async function cabutDariJadwal(b) {
+  const keys = Object.keys(b.results || {}).map((k) => `${b.classId}:${k}`);
+  if (keys.length) await ipcRenderer.invoke('draw:cabutJadwal', keys);
+  refreshSent();
+}
+
+function renderAtlet(b) {
+  const body = $('bAtlet');
+  body.textContent = '';
+  const out = BR.eliminated(b);
+  const champ = BR.champion(b);
+  const wd = new Set(b.wd || []);
+  const rounds = BR.roundsOf(b);
+  const c = data.classes.find((x) => x.id === b.classId);
+  b.slots.filter(Boolean).forEach((s, k) => {
+    const tr = document.createElement('tr');
+    const td = (t) => { const e = document.createElement('td'); e.textContent = t; tr.appendChild(e); return e; };
+    td(k + 1);
+    td(s.name);
+    td(s.club);
+    let status = 'Aktif';
+    if (champ && champ.id === s.id) status = '🥇 Juara 1';
+    else if (out.has(s.id)) status = 'Kalah di ' + roundName(out.get(s.id), rounds);
+    if (wd.has(s.id)) status = 'Mundur (WDR)' + (out.has(s.id) ? ' · ' + status : '');
+    td(status);
+    const act = td('');
+    if (wd.has(s.id)) {
+      act.appendChild(mkBtn('Batalkan mundur', '', () => {
+        if (!BR.unmarkWd(b, s.id)) { $('bMsg').textContent = 'Tidak bisa dibatalkan: sudah ada hasil sungguhan di atas hasil WDR atlet ini.'; return; }
+        addLog(`Mundur dibatalkan: ${s.name}`);
+        save();
+      }, true));
+    } else if (!out.has(s.id) && !(champ && champ.id === s.id)) {
+      act.appendChild(mkBtn('Tandai mundur (WDR)', 'danger', async () => {
+        BR.markWd(b, s.id);
+        addLog(`Mundur (WDR): ${s.name}${c ? ', ' + c.name : ''}`);
+        await cabutDariJadwal(b);
+        save();
+      }, true));
+    }
+    body.appendChild(tr);
+  });
+}
+
+// kirim pertandingan yang sudah siap (kedua peserta diketahui) di hari + arena terpilih ke Jadwal
+$('btnKirim').onclick = async () => {
+  const nums = numberMatches();
+  const list = nums.groups.get(`${$('aDay').value}:${$('aArena').value}`) || [];
+  const rows = [];
+  list.forEach((m) => {
+    const b = data.brackets.find((x) => x.classId === m.classId);
+    const c = data.classes.find((x) => x.id === m.classId);
+    if (!b || !c || sentSet.has(`${m.classId}:${m.r}:${m.i}`)) return;
+    if (b.results && b.results[BR.key(m.r, m.i)]) return;
+    const [e1, e2] = BR.entries(b, m.r, m.i);
+    const wd = b.wd || [];
+    if (!e1 || !e2 || wd.includes(e1.id) || wd.includes(e2.id)) return;
+    const [chung, hong] = ATAS_ADALAH === 'chung' ? [e1, e2] : [e2, e1];
+    rows.push({
+      classId: m.classId, r: m.r, i: m.i, no: m.no,
+      category: `${c.name} · ${roundName(m.r, m.rounds)}`,
+      chungName: chung.name, chungCountry: chung.club, chungId: chung.id,
+      hongName: hong.name, hongCountry: hong.club, hongId: hong.id,
+    });
+  });
+  if (!rows.length) { $('aMsg').textContent = 'Tidak ada pertandingan siap yang belum dikirim di hari dan arena ini.'; return; }
+  const r = await ipcRenderer.invoke('draw:kirimJadwal', rows);
+  $('aMsg').textContent = `${r.added} pertandingan dikirim ke Jadwal` + (r.skipped ? `, ${r.skipped} sudah ada` : '') + '.';
+  if (r.added) { addLog(`Kirim ke Jadwal: ${r.added} pertandingan (${data.event.days[Number($('aDay').value)]}, Arena ${$('aArena').value})`); save(); }
+  refreshSent();
+};
+
+// hasil pertandingan dari scoring masuk ke bagan (dikirim oleh main.js)
+ipcRenderer.on('draw:changed', (e, d) => {
+  data = d;
+  if (!data.brackets) data.brackets = [];
+  if (!data.drawLog) data.drawLog = [];
+  render();
+});
+
+function render() { renderEvent(); renderKelas(); renderPeserta(); renderBagan(); renderArena(); renderPaket(); refreshSent(); }
 
 (async () => {
   data = await ipcRenderer.invoke('draw:get');
