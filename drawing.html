@@ -42,7 +42,7 @@
     <button class="tab" data-tab="peserta">Peserta</button>
     <button class="tab" data-tab="bagan">Bagan</button>
     <button class="tab" data-tab="arena">Arena &amp; Nomor</button>
-    <button class="tab" data-tab="klasemen">Klasemen</button>
+    <button class="tab" data-tab="klasemen">Perolehan Medali</button>
     <button class="tab" data-tab="paket">Paket</button>
   </div>
 
@@ -191,20 +191,17 @@
     </table>
   </section>
 
-  <!-- TAB KLASEMEN -->
+<!-- TAB KLASEMEN -->
   <section id="tab-klasemen" hidden>
-    <h2>Klasemen kontingen</h2>
+    <h2>Perolehan medali kontingen (juara umum)</h2>
     <div class="row">
-      <label>Urutan
-        <select id="kMode">
-          <option value="poin">Poin WT (1 masuk + 1 menang + 120/50/20 medali)</option>
-          <option value="medali">Perolehan medali (emas, perak, perunggu)</option>
-        </select>
-      </label>
+      <button id="btnPdfMedal">🖨 PDF perolehan medali</button>
+      <button id="btnXlsMedal">📊 Ekspor Excel</button>
+      <span id="kMsg" class="muted"></span>
     </div>
     <div id="kInfo" class="muted"></div>
     <table>
-      <thead><tr><th style="width:90px">Peringkat</th><th>Kontingen</th><th>Emas</th><th>Perak</th><th>Perunggu</th><th>Atlet</th><th>Menang</th><th>Poin</th></tr></thead>
+      <thead><tr><th style="width:90px">Peringkat</th><th>Kontingen</th><th>Emas</th><th>Perak</th><th>Perunggu</th><th>Total</th></tr></thead>
       <tbody id="kBody"></tbody>
     </table>
     <h2>Medali per kelas</h2>
@@ -212,7 +209,7 @@
       <thead><tr><th>Kelas</th><th style="width:90px">Progres</th><th>🥇 Emas</th><th>🥈 Perak</th><th>🥉 Perunggu</th><th>🥉 Perunggu</th></tr></thead>
       <tbody id="kClass"></tbody>
     </table>
-    <p class="muted">Perunggu diberikan kepada dua atlet yang kalah di semifinal (kelas 3 atlet: satu perunggu; kelas 2 atlet: tanpa perunggu). Atlet yang mundur sebelum pernah bertanding tidak dihitung masuk arena dan tidak mendapat medali. Pada klasemen Poin WT, kemenangan karena bye dan WDR dihitung.</p>
+    <p class="muted">Peringkat menurut jumlah emas, lalu perak, lalu perunggu (tanpa poin). Perunggu diberikan kepada dua atlet yang kalah di semifinal (kelas 3 atlet: satu perunggu; kelas 2 atlet: tanpa perunggu). Atlet yang mundur sebelum pernah bertanding tidak mendapat medali.</p>
   </section>
 
   <!-- TAB PAKET -->
@@ -1294,41 +1291,78 @@ ipcRenderer.on('draw:changed', (e, d) => {
   render();
 });
 
-// ===== KLASEMEN: medali per kelas dan klasemen kontingen =====
-function renderKlasemen() {
+// ===== PEROLEHAN MEDALI: per kontingen (juara umum, tanpa poin) dan per kelas =====
+const nmE = (e) => (e ? (e.club ? `${e.name} · ${e.club}` : e.name) : '—');
+
+function medalData() {
   const brs = data.brackets.filter((b) => data.classes.some((c) => c.id === b.classId));
-  const rows = BR.standings(brs, $('kMode').value || 'poin');
+  const teams = BR.standings(brs, 'medali')
+    .map((t) => ({ ...t, total: t.gold + t.silver + t.bronze }))
+    .filter((t) => t.total > 0);
+  const classes = data.classes.map((c) => {
+    const b = data.brackets.find((x) => x.classId === c.id);
+    if (!b) return null;
+    const m = BR.medals(b);
+    return {
+      name: c.name,
+      done: m.done,
+      progress: m.done ? 'Selesai' : `${Object.keys(b.results || {}).length}/${bracketMatches(b).length}`,
+      gold: m.done ? nmE(m.gold) : '',
+      silver: m.done ? nmE(m.silver) : '',
+      b1: m.done ? nmE(m.bronze[0]) : '',
+      b2: m.done && b.size > 2 ? nmE(m.bronze[1]) : '',
+    };
+  }).filter(Boolean);
+  return { teams, classes, pending: classes.filter((x) => !x.done).length };
+}
+
+function renderKlasemen() {
+  const { teams, classes, pending } = medalData();
   const cell = (tr, v) => { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); };
   const body = $('kBody');
   body.textContent = '';
-  rows.forEach((t) => {
+  teams.forEach((t) => {
     const tr = document.createElement('tr');
-    [(t.tie ? '= ' : '') + t.rank, t.name, t.gold, t.silver, t.bronze, t.entered, t.wins, t.points].forEach((v) => cell(tr, v));
+    [(t.tie ? '= ' : '') + t.rank, t.name, t.gold, t.silver, t.bronze, t.total].forEach((v) => cell(tr, v));
     body.appendChild(tr);
   });
-  $('kInfo').textContent = !rows.length ? 'Belum ada bagan.'
-    : rows.some((t) => t.tie) ? 'Tanda "=" berarti seri sempurna; kriteria berikutnya (poin di kelas yang lebih berat) diputuskan manual.' : '';
-
+  $('kInfo').textContent = !classes.length ? 'Belum ada bagan.'
+    : !teams.length ? 'Belum ada medali.'
+      : (pending ? `Sementara: ${pending} kelas belum selesai. ` : '')
+        + (teams.some((t) => t.tie) ? 'Tanda "=" berarti seri (emas, perak, perunggu sama), diputuskan panitia.' : '');
   const cb = $('kClass');
   cb.textContent = '';
-  data.classes.forEach((c) => {
-    const b = data.brackets.find((x) => x.classId === c.id);
-    if (!b) return;
-    const m = BR.medals(b);
-    const total = bracketMatches(b).length;
-    const done = Object.keys(b.results || {}).length;
+  classes.forEach((x) => {
     const tr = document.createElement('tr');
-    const nm = (e) => (e ? (e.club ? `${e.name} · ${e.club}` : e.name) : '—');
-    cell(tr, c.name);
-    cell(tr, m.done ? 'Selesai' : `${done}/${total}`);
-    cell(tr, m.done ? nm(m.gold) : '');
-    cell(tr, m.done ? nm(m.silver) : '');
-    cell(tr, m.done ? nm(m.bronze[0]) : '');
-    cell(tr, m.done && b.size > 2 ? nm(m.bronze[1]) : '');
+    [x.name, x.progress, x.gold, x.silver, x.b1, x.b2].forEach((v) => cell(tr, v));
     cb.appendChild(tr);
   });
 }
-$('kMode').addEventListener('change', renderKlasemen);
+
+async function printMedals() {
+  const kop = await ipcRenderer.invoke('draw:getKop');
+  const { teams, classes, pending } = medalData();
+  if (!classes.length) { $('kMsg').textContent = 'Belum ada bagan.'; return; }
+  const info = (pending ? `SEMENTARA, ${pending} kelas belum selesai` : 'Semua kelas selesai') + ` · dicetak ${new Date().toLocaleString('id-ID')}`;
+  const trs = teams.length
+    ? teams.map((t) => `<tr><td class="c">${t.tie ? '= ' : ''}${t.rank}</td><td>${escH(t.name)}</td><td class="c">${t.gold}</td><td class="c">${t.silver}</td><td class="c">${t.bronze}</td><td class="c">${t.total}</td></tr>`).join('')
+    : '<tr><td colspan="6">Belum ada medali.</td></tr>';
+  const note = teams.some((t) => t.tie) ? '<p class="in">Tanda "=" berarti seri (emas, perak, perunggu sama), diputuskan panitia.</p>' : '';
+  const t1 = `<table><thead><tr><th style="width:24mm">Peringkat</th><th>Kontingen</th><th style="width:24mm">Emas</th><th style="width:24mm">Perak</th><th style="width:24mm">Perunggu</th><th style="width:24mm">Total</th></tr></thead><tbody>${trs}</tbody></table>${note}`;
+  const rows2 = classes.map((x) => `<tr><td>${escH(x.name)}</td><td>${escH(x.progress)}</td><td>${escH(x.gold)}</td><td>${escH(x.silver)}</td><td>${escH(x.b1)}</td><td>${escH(x.b2)}</td></tr>`).join('');
+  const t2 = `<table><thead><tr><th>Kelas</th><th style="width:20mm">Progres</th><th>Emas</th><th>Perak</th><th>Perunggu</th><th>Perunggu</th></tr></thead><tbody>${rows2}</tbody></table>`;
+  await savePdf([
+    pdfPage(kop, 'Perolehan Medali Kontingen (Juara Umum)', info, t1, false),
+    pdfPage(kop, 'Medali per Kelas', info, t2, true),
+  ], 'Perolehan-Medali.pdf', 'kMsg');
+}
+$('btnPdfMedal').onclick = printMedals;
+$('btnXlsMedal').onclick = async () => {
+  const { teams, classes, pending } = medalData();
+  if (!classes.length) { $('kMsg').textContent = 'Belum ada bagan.'; return; }
+  const r = await ipcRenderer.invoke('draw:exportMedali', { teams, classes, pending });
+  if (r.msg) $('kMsg').textContent = r.msg;
+};
 
 // ----- hasil: arena -> panitia -----
 $('btnHsExport').onclick = async () => {

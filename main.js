@@ -938,6 +938,45 @@ ipcMain.handle('draw:pickLogo', async (e) => {
 });
 ipcMain.handle('draw:clearLogo', () => { removeLogo(); return { ok: true }; });
 
+// ----- ekspor perolehan medali (juara umum) ke Excel -----
+ipcMain.handle('draw:exportMedali', async (e, p) => {
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const num = (v) => Math.max(0, parseInt(v, 10) || 0);
+  const teams = (p && Array.isArray(p.teams) ? p.teams : []).slice(0, 2000).map((t) => [
+    t.tie ? '= ' + num(t.rank) : num(t.rank), clean(t.name, 60), num(t.gold), num(t.silver), num(t.bronze), num(t.total),
+  ]);
+  const classes = (p && Array.isArray(p.classes) ? p.classes : []).slice(0, 500).map((c) => [
+    clean(c.name), clean(c.progress, 12), clean(c.gold, 100), clean(c.silver, 100), clean(c.b1, 100), clean(c.b2, 100),
+  ]);
+  if (!classes.length) return { ok: false, msg: 'Belum ada bagan.' };
+  const pending = num(p && p.pending);
+  const r = await dialog.showSaveDialog(parent, { defaultPath: 'Perolehan-Medali.xlsx', filters: [{ name: 'Excel', extensions: ['xlsx'] }] });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePath) return { ok: false, msg: '' };
+  try {
+    const XLSX = require('xlsx');
+    const status = pending ? `SEMENTARA, ${pending} kelas belum selesai` : 'Semua kelas selesai';
+    const ws1 = XLSX.utils.aoa_to_sheet([
+      [settings.eventName || 'Perolehan Medali'],
+      ['Perolehan Medali Kontingen (Juara Umum) · ' + status],
+      [],
+      ['Peringkat', 'Kontingen', 'Emas', 'Perak', 'Perunggu', 'Total'],
+      ...(teams.length ? teams : [['Belum ada medali']]),
+    ]);
+    ws1['!cols'] = [{ wch: 12 }, { wch: 34 }, { wch: 9 }, { wch: 9 }, { wch: 11 }, { wch: 9 }];
+    const ws2 = XLSX.utils.aoa_to_sheet([['Kelas', 'Progres', 'Emas', 'Perak', 'Perunggu 1', 'Perunggu 2'], ...classes]);
+    ws2['!cols'] = [{ wch: 28 }, { wch: 10 }, { wch: 34 }, { wch: 34 }, { wch: 34 }, { wch: 34 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, 'Juara Umum');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Medali per Kelas');
+    XLSX.writeFile(wb, r.filePath);
+    shell.showItemInFolder(r.filePath);
+    return { ok: true, msg: 'Excel disimpan.' };
+  } catch (err) {
+    return { ok: false, msg: 'Gagal menyimpan Excel: ' + err.message };
+  }
+});
+
 // PDF Drawing: HTML dari jendela Drawing dijadikan PDF (ukuran dan orientasi mengikuti @page di HTML), lalu disimpan lewat dialog
 ipcMain.handle('draw:savePdf', async (e, html, name) => {
   if (typeof html !== 'string' || html.length > 40 * 1024 * 1024) return { ok: false, msg: 'Dokumen terlalu besar.' };

@@ -209,7 +209,7 @@ function standings(brackets, mode) {
   });
   const rows = [...teams.values()];
   rows.forEach((t) => { t.points = t.entered + t.wins + 120 * t.gold + 50 * t.silver + 20 * t.bronze; });
-  const keyOf = (t) => (mode === 'medali' ? [t.gold, t.silver, t.bronze, t.points, t.entered] : [t.points, t.gold, t.silver, t.bronze, t.entered]);
+  const keyOf = (t) => (mode === 'medali' ? [t.gold, t.silver, t.bronze] : [t.points, t.gold, t.silver, t.bronze, t.entered]);
   const cmp = (a, c) => {
     const ka = keyOf(a);
     const kc = keyOf(c);
