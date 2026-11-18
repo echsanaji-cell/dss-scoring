@@ -900,6 +900,44 @@ ipcMain.handle('draw:set', (e, d) => {
   saveDraw();
   return drawData;
 });
+// ===== KOP DOKUMEN: nama event dan logo (opsional) untuk PDF Drawing =====
+const logoBase = path.join(app.getPath('userData'), 'kop-logo');
+function readLogo() {
+  for (const [ext, mime] of [['png', 'image/png'], ['jpg', 'image/jpeg']]) {
+    try { return `data:${mime};base64,` + fs.readFileSync(`${logoBase}.${ext}`).toString('base64'); } catch (e) {}
+  }
+  return '';
+}
+function removeLogo() {
+  for (const ext of ['png', 'jpg']) { try { fs.unlinkSync(`${logoBase}.${ext}`); } catch (e) {} }
+}
+ipcMain.handle('draw:getKop', () => ({ eventName: settings.eventName || '', logo: readLogo() }));
+ipcMain.handle('draw:setEventName', (e, name) => {
+  settings.eventName = clean(name, 80);
+  saveSettings();
+  broadcast();
+  return settings.eventName;
+});
+ipcMain.handle('draw:pickLogo', async (e) => {
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showOpenDialog(parent, { properties: ['openFile'], filters: [{ name: 'Gambar logo', extensions: ['png', 'jpg', 'jpeg'] }] });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePaths.length) return { ok: false, msg: '' };
+  try {
+    const buf = fs.readFileSync(r.filePaths[0]);
+    if (buf.length > 2 * 1024 * 1024) return { ok: false, msg: 'Logo terlalu besar (maksimal 2 MB).' };
+    const isPng = buf.length > 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    const isJpg = buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+    if (!isPng && !isJpg) return { ok: false, msg: 'File bukan gambar PNG atau JPG yang valid.' };
+    removeLogo();
+    fs.writeFileSync(`${logoBase}.${isPng ? 'png' : 'jpg'}`, buf);
+    return { ok: true, msg: 'Logo disimpan.' };
+  } catch (err) {
+    return { ok: false, msg: 'Gagal membaca logo: ' + err.message };
+  }
+});
+ipcMain.handle('draw:clearLogo', () => { removeLogo(); return { ok: true }; });
+
 // ===== PAKET ARENA: ekspor dari laptop panitia, impor di laptop arena =====
 function newUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 function ensureUid() {

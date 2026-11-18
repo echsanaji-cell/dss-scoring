@@ -48,6 +48,19 @@
 
   <!-- TAB EVENT -->
   <section id="tab-event">
+    <h2>Kop dokumen (opsional)</h2>
+    <div class="row">
+      <label>Nama event <input id="kopName" type="text" maxlength="80" placeholder="mis. Kejuaraan Terbuka 2026" style="width:360px"></label>
+      <span class="muted">tampil di scoreboard dan di kop PDF</span>
+    </div>
+    <div class="row">
+      <img id="kopLogo" alt="Logo" hidden style="max-height:64px;max-width:160px;background:#fff;border-radius:6px;padding:4px">
+      <span id="kopNoLogo" class="muted">Belum ada logo (PDF dicetak tanpa logo)</span>
+      <button id="btnLogoPick">🖼 Pilih logo…</button>
+      <button id="btnLogoClear" class="danger">Hapus logo</button>
+      <span id="kopMsg" class="muted"></span>
+    </div>
+    <p class="muted">Logo opsional: PNG atau JPG, maksimal 2 MB. Tanpa logo, PDF tetap bisa dicetak.</p>
     <h2>Arena</h2>
     <div class="row">
       <label>Jumlah arena <input id="arenas" type="number" min="1" max="20" style="width:80px"></label>
@@ -297,7 +310,30 @@ $('arenas').addEventListener('change', () => { data.event.arenas = Number($('are
 $('eventYear').addEventListener('change', () => { data.event.year = Number($('eventYear').value) || new Date().getFullYear(); save(); });
 $('btnAddDay').onclick = () => { data.event.days.push('Hari ' + (data.event.days.length + 1)); save(); };
 
-// ===== KELAS =====
+// ===== KOP DOKUMEN: nama event + logo opsional =====
+let kopLogo = '';
+async function refreshKop() {
+  const k = await ipcRenderer.invoke('draw:getKop');
+  if (document.activeElement !== $('kopName')) $('kopName').value = k.eventName;
+  kopLogo = k.logo;
+  $('kopLogo').hidden = !kopLogo;
+  $('kopNoLogo').hidden = !!kopLogo;
+  $('btnLogoClear').disabled = !kopLogo;
+  if (kopLogo) $('kopLogo').src = kopLogo;
+}
+$('kopName').addEventListener('change', async () => {
+  $('kopName').value = await ipcRenderer.invoke('draw:setEventName', $('kopName').value);
+});
+$('btnLogoPick').onclick = async () => {
+  const r = await ipcRenderer.invoke('draw:pickLogo');
+  if (r.msg) $('kopMsg').textContent = r.msg;
+  if (r.ok) refreshKop();
+};
+twoClick($('btnLogoClear'), async () => {
+  await ipcRenderer.invoke('draw:clearLogo');
+  $('kopMsg').textContent = 'Logo dihapus.';
+  refreshKop();
+});
 function addClasses(list) { // list = [{ age, gender, name }]
   const have = new Set(data.classes.map((c) => c.name));
   let id = data.classes.reduce((m, c) => Math.max(m, c.id), 0);
@@ -1037,6 +1073,7 @@ $('btnPkAll').onclick = async () => {
 };
 $('btnPkImport').onclick = async () => {
   const r = await ipcRenderer.invoke('draw:importPaket', $('pkOver').checked);
+  if (r.ok) refreshKop();
   if (r.data) { data = r.data; render(); }
   if (r.msg) $('pkMsg').textContent = r.msg;
 };
@@ -1189,6 +1226,7 @@ function render() { renderEvent(); renderKelas(); renderPeserta(); renderBagan()
 
 (async () => {
   data = await ipcRenderer.invoke('draw:get');
+  refreshKop();
   if (!data.participants) data.participants = [];
   if (!data.event.year) data.event.year = new Date().getFullYear();
   if (!data.brackets) data.brackets = [];
