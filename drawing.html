@@ -182,6 +182,8 @@
       <label>Arena <select id="aArena"></select></label>
       <span id="aCount" class="muted"></span>
       <button id="btnKirim">📋 Kirim yang siap ke Jadwal</button>
+      <button id="btnPdfDay">🖨 PDF hari + arena ini</button>
+      <button id="btnPdfDays">🖨 PDF semua hari &amp; arena</button>
     </div>
     <table>
       <thead><tr><th style="width:60px">No</th><th>Kelas</th><th>Babak</th><th>Peserta 1</th><th>Peserta 2</th><th style="width:190px">Status</th><th style="width:210px">Aksi</th></tr></thead>
@@ -1092,12 +1094,19 @@ header { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid
 .ev { font-size: 18px; font-weight: 700; }
 .tt { font-size: 15px; font-weight: 600; margin-top: 2px; }
 .in { font-size: 11px; color: #555; margin-top: 2px; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th, td { border: 1px solid #888; padding: 4px 6px; text-align: left; vertical-align: top; }
+th { background: #e0e0e0; }
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+td.c { text-align: center; font-weight: 700; }
+td.w { height: 9mm; }
 </style></head><body>${pages.join('')}</body></html>`;
 }
 
-async function savePdf(pages, name) {
+async function savePdf(pages, name, msgId = 'pdfMsg') {
   const r = await ipcRenderer.invoke('draw:savePdf', pdfDoc(pages), name);
-  $('pdfMsg').textContent = r.msg || '';
+  $(msgId).textContent = r.msg || '';
 }
 
 // list = [[kelas, bagan], ...]; satu halaman per kelas
@@ -1125,6 +1134,48 @@ $('btnPdfAll').onclick = () => {
   const list = data.classes.map((c) => [c, data.brackets.find((x) => x.classId === c.id)]).filter(([c, b]) => b);
   if (!list.length) { $('pdfMsg').textContent = 'Belum ada bagan.'; return; }
   printBrackets(list);
+};
+
+// ----- PDF daftar pertandingan per hari + arena -----
+function matchPair(b, m, nums) {
+  const [l1, l2] = entryLabels(b, m, nums);
+  const [e1, e2] = BR.entries(b, m.r, m.i);
+  const nm = (e) => (e.club ? `${e.name} · ${e.club}` : e.name);
+  return [e1 ? nm(e1) : l1, e2 ? nm(e2) : l2];
+}
+
+function arenaPage(day, arena, nums, kop, last) {
+  const list = nums.groups.get(`${day}:${arena}`) || [];
+  const [h1, h2] = ATAS_ADALAH === 'chung' ? ['Chung (biru)', 'Hong (merah)'] : ['Hong (merah)', 'Chung (biru)'];
+  const rows = list.map((m) => {
+    const b = data.brackets.find((x) => x.classId === m.classId);
+    const c = data.classes.find((x) => x.id === m.classId);
+    const [p1, p2] = matchPair(b, m, nums);
+    const res = b.results && b.results[BR.key(m.r, m.i)];
+    const win = res ? (res.auto ? 'WDR: ' : '') + res.winner.name : '';
+    return `<tr><td class="c">${String(m.no).padStart(3, '0')}</td><td>${escH(c.name)}</td><td>${escH(roundName(m.r, m.rounds))}</td><td>${escH(p1)}</td><td>${escH(p2)}</td><td class="w">${escH(win)}</td></tr>`;
+  }).join('');
+  const table = `<table><thead><tr><th style="width:14mm">No</th><th>Kelas</th><th style="width:28mm">Babak</th><th>${h1}</th><th>${h2}</th><th style="width:48mm">Pemenang</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const info = `${list.length} pertandingan · dicetak ${new Date().toLocaleString('id-ID')}`;
+  return pdfPage(kop, `Daftar Pertandingan · ${data.event.days[day]} · Arena ${arena}`, info, table, last);
+}
+
+// groups = [[hari, arena], ...]; yang tidak punya pertandingan dilewati
+async function printMatches(groups) {
+  const kop = await ipcRenderer.invoke('draw:getKop');
+  const nums = numberMatches();
+  const use = groups.filter(([d, a]) => (nums.groups.get(`${d}:${a}`) || []).length);
+  if (!use.length) { $('aMsg').textContent = 'Tidak ada pertandingan untuk dicetak (bagi kelas ke arena dulu).'; return; }
+  const pages = use.map(([d, a], k) => arenaPage(d, a, nums, kop, k === use.length - 1));
+  const name = use.length === 1
+    ? `Pertandingan-${String(data.event.days[use[0][0]]).replace(/[^A-Za-z0-9]+/g, '-')}-Arena-${use[0][1]}.pdf`
+    : 'Pertandingan-Semua-Arena.pdf';
+  await savePdf(pages, name, 'aMsg');
+}
+$('btnPdfDay').onclick = () => printMatches([[Number($('aDay').value) || 0, Number($('aArena').value) || 1]]);
+$('btnPdfDays').onclick = () => {
+  const keys = [...numberMatches().groups.keys()].map((k) => k.split(':').map(Number)).sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+  printMatches(keys);
 };
 
 // ===== PAKET ARENA =====
