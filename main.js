@@ -938,6 +938,32 @@ ipcMain.handle('draw:pickLogo', async (e) => {
 });
 ipcMain.handle('draw:clearLogo', () => { removeLogo(); return { ok: true }; });
 
+// PDF Drawing: HTML dari jendela Drawing dijadikan PDF (ukuran dan orientasi mengikuti @page di HTML), lalu disimpan lewat dialog
+ipcMain.handle('draw:savePdf', async (e, html, name) => {
+  if (typeof html !== 'string' || html.length > 40 * 1024 * 1024) return { ok: false, msg: 'Dokumen terlalu besar.' };
+  const safe = String(name || 'Drawing.pdf').replace(/[^A-Za-z0-9._+-]/g, '_').slice(0, 80);
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dss-'));
+  const tmp = path.join(tmpDir, 'drawing.html');
+  const win = new BrowserWindow({ show: false });
+  try {
+    fs.writeFileSync(tmp, html, 'utf8');
+    await win.loadFile(tmp);
+    const pdf = await win.webContents.printToPDF({ preferCSSPageSize: true, printBackground: true });
+    const r = await dialog.showSaveDialog(parent, { defaultPath: safe, filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+    if (r.canceled || !r.filePath) return { ok: false, msg: '' };
+    fs.writeFileSync(r.filePath, pdf);
+    shell.showItemInFolder(r.filePath);
+    return { ok: true, msg: 'PDF disimpan.' };
+  } catch (err) {
+    return { ok: false, msg: 'Gagal membuat PDF: ' + err.message };
+  } finally {
+    win.destroy();
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (x) {}
+    if (parent) parent.focus();
+  }
+});
+
 // ===== PAKET ARENA: ekspor dari laptop panitia, impor di laptop arena =====
 function newUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 function ensureUid() {

@@ -146,6 +146,11 @@
     <div id="bInfo" class="muted"></div>
     <div id="bWarn" class="warn"></div>
     <div id="bView" class="bracket-box"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnPdfOne">🖨 PDF bagan ini</button>
+      <button id="btnPdfAll">🖨 PDF semua bagan</button>
+      <span id="pdfMsg" class="muted"></span>
+    </div>
     <h2>Peserta bagan</h2>
     <table>
       <thead><tr><th style="width:44px">No</th><th>Nama</th><th>Kontingen</th><th>Status</th><th style="width:210px"></th></tr></thead>
@@ -1058,6 +1063,69 @@ twoClick($('btnResetAssign'), () => {
   $('aMsg').textContent = 'Pembagian direset.';
   save();
 });
+
+// ===== CETAK PDF =====
+const escH = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// bagan di layar berwarna gelap; untuk kertas warnanya dipetakan ke palet terang
+const PRINT_COLORS = { '#1f262e': '#ffffff', '#455a64': '#607d8b', '#eceff1': '#111111', '#78909c': '#757575', '#81c784': '#1b5e20', '#546e7a': '#455a64', '#37474f': '#cfd8dc', '#90a4ae': '#555555' };
+function printSvg(b, nums) {
+  const svg = bracketSvg(b, nums);
+  svg.removeAttribute('width');
+  svg.removeAttribute('height');
+  svg.setAttribute('style', 'width:100%;height:auto;max-height:150mm');
+  return new XMLSerializer().serializeToString(svg).replace(/#[0-9a-fA-F]{6}\b/g, (c) => PRINT_COLORS[c.toLowerCase()] || c);
+}
+
+function pdfPage(kop, title, info, body, last) {
+  const logo = kop.logo ? `<img class="logo" src="${kop.logo}">` : '';
+  return `<section class="pg${last ? '' : ' br'}"><header>${logo}<div><div class="ev">${escH(kop.eventName) || '&nbsp;'}</div><div class="tt">${escH(title)}</div><div class="in">${escH(info)}</div></div></header>${body}</section>`;
+}
+
+function pdfDoc(pages) {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+@page { size: A4 landscape; margin: 10mm; }
+body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
+.br { page-break-after: always; }
+header { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 8px; }
+.logo { max-height: 18mm; max-width: 40mm; }
+.ev { font-size: 18px; font-weight: 700; }
+.tt { font-size: 15px; font-weight: 600; margin-top: 2px; }
+.in { font-size: 11px; color: #555; margin-top: 2px; }
+</style></head><body>${pages.join('')}</body></html>`;
+}
+
+async function savePdf(pages, name) {
+  const r = await ipcRenderer.invoke('draw:savePdf', pdfDoc(pages), name);
+  $('pdfMsg').textContent = r.msg || '';
+}
+
+// list = [[kelas, bagan], ...]; satu halaman per kelas
+async function printBrackets(list) {
+  const kop = await ipcRenderer.invoke('draw:getKop');
+  const nums = numberMatches();
+  const pages = list.map(([c, b], k) => {
+    const n = nPeserta(b);
+    const info = `${n} peserta · bagan ${b.size} · ${b.size - n} bye · kode acak ${b.seed}`
+      + (placed(b) ? ` · ${data.event.days[b.day]} · Arena ${b.arena}` : '')
+      + ` · dicetak ${new Date().toLocaleString('id-ID')}`;
+    return pdfPage(kop, 'Bagan ' + c.name, info, printSvg(b, nums), k === list.length - 1);
+  });
+  const name = list.length === 1 ? `Bagan-${list[0][0].name.replace(/[^A-Za-z0-9+-]+/g, '-')}.pdf` : 'Bagan-Semua-Kelas.pdf';
+  await savePdf(pages, name);
+}
+
+$('btnPdfOne').onclick = () => {
+  const b = data.brackets.find((x) => x.classId === viewClassId);
+  const c = data.classes.find((x) => x.id === viewClassId);
+  if (!b || !c) { $('pdfMsg').textContent = 'Pilih bagan dulu lewat tombol Lihat.'; return; }
+  printBrackets([[c, b]]);
+};
+$('btnPdfAll').onclick = () => {
+  const list = data.classes.map((c) => [c, data.brackets.find((x) => x.classId === c.id)]).filter(([c, b]) => b);
+  if (!list.length) { $('pdfMsg').textContent = 'Belum ada bagan.'; return; }
+  printBrackets(list);
+};
 
 // ===== PAKET ARENA =====
 function renderPaket() {
