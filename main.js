@@ -90,7 +90,7 @@ function newMatch() {
     chung: { name: 'Hassan Idman', country: 'IRI' },
     hong: { name: 'James Stuart', country: 'GBR' },
     round: 1,
-    phase: 'waiting', // waiting | running | paused | rest | tie | kyeshi | ivr | test | ended
+    phase: 'waiting', // waiting | running | paused | rest | tie | kyeshi | ivr | ended
     timeLeft: settings.roundTime,
     tenths: 0,        // sepersepuluh detik (0-9), untuk tampilan 10 detik terakhir
     savedTenths: 0,
@@ -145,7 +145,6 @@ function loadSavedMatch() {
     const restored = Object.assign(newMatch(), raw.state, { settings, meta: META });
     restored.restoredFrom = restored.phase;
     if (restored.phase === 'running') restored.phase = 'paused'; // jam tidak langsung jalan
-    if (restored.phase === 'test') restored.phase = 'waiting';
     restored.restoredAt = Date.now();
     nextId = restored.events.reduce((m, e) => Math.max(m, e.id), 0) + 1;
     state = restored;
@@ -605,7 +604,7 @@ function handle(type, p = {}) {
       break;
 
     case 'manualResult': // p = { side: pemenang, code: 'RSC'|'WDR'|'DSQ' }
-      if (!['ended', 'test', 'ivr', 'tie'].includes(state.phase) &&
+      if (!['ended', 'ivr', 'tie'].includes(state.phase) &&
           (p.side === 'chung' || p.side === 'hong') && ['RSC', 'WDR', 'DSQ', 'DQB'].includes(p.code)) {
         state.manualFrom = state.phase === 'running' ? 'paused' : state.phase;
         state.savedTime = state.timeLeft;

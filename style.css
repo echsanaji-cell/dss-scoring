@@ -179,9 +179,8 @@ body.minus .b-sign { background: #c62828 !important; }
 .op-settings label { display: flex; align-items: center; gap: 8px; }
 .op-settings input[type="number"] { width: 90px; }
 
-/* ===== TEST, DOCTOR, KYESHI ===== */
+/* ===== DOCTOR, KYESHI ===== */
 body[data-phase="kyeshi"] .timer { background: #e53935; color: #fff; }
-body[data-phase="test"] .timer   { background: #607d8b; color: #fff; }
 
 
 .inj { display: none; gap: 10px; align-items: center; margin-top: 12px; padding: 10px; background: #5a1a1a; border-radius: 8px; }
@@ -232,10 +231,6 @@ body[data-phase="tie"] .tie { display: block; }
 .b-ref  { background: #5e35b1 !important; }
 .b-tech { background: #388e3c !important; }
 
-.ivr-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-.chip { background: #37474f; padding: 4px 8px; border-radius: 14px; }
-.chip button { background: transparent !important; padding: 0 4px; }
-
 .op-log { margin-top: 12px; max-height: 260px; overflow: auto; background: #222; border-radius: 8px; }
 .op-log table { width: 100%; border-collapse: collapse; }
 .op-log th, .op-log td { padding: 5px 8px; border-bottom: 1px solid #333; text-align: left; }
@@ -245,13 +240,6 @@ body[data-phase="tie"] .tie { display: block; }
 /* scoreboard: tiebreaker */
 body[data-phase="tie"] .timer { background: #8e24aa; color: #fff; }
 .tb-title { font-size: 6vh; font-weight: 800; letter-spacing: .3vw; }
-.tb-crit { font-size: 7vh; font-weight: 800; background: #fff; color: #000; padding: 1vh 4vw; }
-.tb-row { display: flex; gap: 8vw; }
-.tb-num { font-size: 26vh; font-weight: 800; line-height: 1; padding: 0 4vw; border-radius: 2vh; }
-.tb-num.chung { background: #1565c0; }
-.tb-num.hong { background: #d32f2f; }
-.tb-num.win { outline: 1.2vh solid #ffeb00; }
-.tb-step { font-size: 3vh; opacity: .7; }
 .tb-votes { display: flex; gap: 3vw; }
 .vote { width: 12vh; height: 12vh; border-radius: 50%; border: .8vh solid #fff; }
 .vote.chung { background: #1565c0; }

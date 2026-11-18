@@ -714,12 +714,6 @@ function bracketSvg(b, nums) {
   const svg = svgEl('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img' });
   const line = (x1, y1, x2, y2, col) => svg.appendChild(svgEl('line', { x1, y1, x2, y2, stroke: col || '#546e7a', 'stroke-width': 1.5 }));
   const full = (e) => (e.club ? `${e.name} · ${e.club}` : e.name);
-  // pemenang otomatis dari pertandingan babak 1 yang salah satu pesertanya bye
-  const auto = (j) => {
-    const a = b.slots[2 * j];
-    const c = b.slots[2 * j + 1];
-    return a && !c ? a : !a && c ? c : null;
-  };
   for (let r = 0; r < rounds; r++) {
     const x = r * (BW + GX);
     svg.appendChild(svgEl('text', { x, y: 18, fill: '#90a4ae', 'font-size': 13, 'font-weight': 600 }, roundName(r, rounds)));
@@ -1296,9 +1290,7 @@ const nmE = (e) => (e ? (e.club ? `${e.name} · ${e.club}` : e.name) : '—');
 
 function medalData() {
   const brs = data.brackets.filter((b) => data.classes.some((c) => c.id === b.classId));
-  const teams = BR.standings(brs, 'medali')
-    .map((t) => ({ ...t, total: t.gold + t.silver + t.bronze }))
-    .filter((t) => t.total > 0);
+  const teams = BR.standings(brs).map((t) => ({ ...t, total: t.gold + t.silver + t.bronze }));
   const classes = data.classes.map((c) => {
     const b = data.brackets.find((x) => x.classId === c.id);
     if (!b) return null;

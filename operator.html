@@ -407,7 +407,7 @@
 
       const names = {
         waiting: 'SIAP', running: 'BERJALAN', paused: 'KAL-YEO', timeUp: 'WAKTU HABIS', roundEnd: 'RONDE SELESAI', rest: 'ISTIRAHAT',
-        tie: 'TIEBREAKER', ended: 'SELESAI', test: 'TEST MODE', kyeshi: 'KYESHI', ivr: 'IVR / KARTU TEKNIS',
+        tie: 'TIEBREAKER', ended: 'SELESAI', kyeshi: 'KYESHI', ivr: 'IVR / KARTU TEKNIS',
       };
       $('phase').textContent = names[st.phase];
       $('round').textContent = 'Ronde ' + st.round;
@@ -1027,7 +1027,7 @@
     };
     setInterval(() => {
       if (!last) return;
-      const canRes = !['ended', 'test', 'ivr', 'tie'].includes(last.phase);
+      const canRes = !['ended', 'ivr', 'tie'].includes(last.phase);
       $('btnResChung').disabled = !canRes;
       $('btnResHong').disabled = !canRes;
       $('btnResCancel').disabled = !(last.phase === 'ended' && last.endedBy === 'manual');

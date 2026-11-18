@@ -110,18 +110,6 @@ function unmarkWd(b, id) {
   return true;
 }
 
-// pertandingan yang sudah bisa dimainkan: kedua peserta diketahui, belum ada hasil, tidak ada yang mundur
-function readyMatches(b) {
-  const wd = new Set(b.wd || []);
-  const out = [];
-  forEachMatch(b, (r, i) => {
-    if (!isPlayed(b, r, i) || (b.results && b.results[key(r, i)])) return;
-    const [e1, e2] = entries(b, r, i);
-    if (e1 && e2 && !wd.has(e1.id) && !wd.has(e2.id)) out.push({ r, i, e1, e2 });
-  });
-  return out;
-}
-
 // Map(id atlet -> babak (r) tempat kalah)
 function eliminated(b) {
   const m = new Map();
@@ -149,7 +137,7 @@ function playedIds(b) {
   return set;
 }
 
-// atlet yang mundur (WDR) sebelum pernah bertanding dianggap tidak masuk arena: tidak dapat poin masuk maupun medali
+// atlet yang mundur (WDR) sebelum pernah bertanding dianggap tidak masuk arena: tidak dapat medali
 function enteredSet(b) {
   const played = playedIds(b);
   const wd = new Set(b.wd || []);
@@ -181,35 +169,24 @@ function medals(b) {
   return out;
 }
 
-// klasemen kontingen menurut WT Competition Rules (Interpretation, Team Standing):
-// 1 poin per atlet yang masuk arena, 1 poin per kemenangan (bye dan WDR dihitung), +120 emas, +50 perak, +20 perunggu
-// mode 'poin': urut poin, lalu emas, perak, perunggu, jumlah atlet; mode 'medali': urut emas, perak, perunggu, lalu poin
-function standings(brackets, mode) {
+// perolehan medali per kontingen (juara umum), tanpa poin: urut emas, perak, perunggu;
+// kontingen dengan medali yang sama persis diberi peringkat sama dan ditandai tie (diputuskan panitia)
+function standings(brackets) {
   const teams = new Map();
   const team = (club) => {
     const name = String(club || '').trim() || '(tanpa kontingen)';
     const k = name.toLowerCase();
-    if (!teams.has(k)) teams.set(k, { name, gold: 0, silver: 0, bronze: 0, entered: 0, wins: 0, points: 0 });
+    if (!teams.has(k)) teams.set(k, { name, gold: 0, silver: 0, bronze: 0 });
     return teams.get(k);
   };
   brackets.forEach((b) => {
-    const entered = enteredSet(b);
-    b.slots.filter(Boolean).forEach((s) => { if (entered.has(s.id)) team(s.club).entered++; });
-    for (let i = 0; i < b.size / 2; i++) { // menang karena bye
-      const a = b.slots[2 * i];
-      const c = b.slots[2 * i + 1];
-      const w = a && !c ? a : !a && c ? c : null;
-      if (w && entered.has(w.id)) team(w.club).wins++;
-    }
-    Object.values(b.results || {}).forEach((res) => { if (res.winner) team(res.winner.club).wins++; });
     const m = medals(b);
     if (m.gold) team(m.gold.club).gold++;
     if (m.silver) team(m.silver.club).silver++;
     m.bronze.forEach((e) => team(e.club).bronze++);
   });
   const rows = [...teams.values()];
-  rows.forEach((t) => { t.points = t.entered + t.wins + 120 * t.gold + 50 * t.silver + 20 * t.bronze; });
-  const keyOf = (t) => (mode === 'medali' ? [t.gold, t.silver, t.bronze] : [t.points, t.gold, t.silver, t.bronze, t.entered]);
+  const keyOf = (t) => [t.gold, t.silver, t.bronze];
   const cmp = (a, c) => {
     const ka = keyOf(a);
     const kc = keyOf(c);
@@ -226,5 +203,5 @@ function standings(brackets, mode) {
   return rows;
 }
 
-const api = { key, roundsOf, forEachMatch, isPlayed, entries, setResult, clearResult, autoAdvance, markWd, unmarkWd, readyMatches, eliminated, champion, playedIds, enteredSet, medals, standings };
+const api = { key, roundsOf, forEachMatch, isPlayed, entries, setResult, clearResult, autoAdvance, markWd, unmarkWd, eliminated, champion, playedIds, enteredSet, medals, standings };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
