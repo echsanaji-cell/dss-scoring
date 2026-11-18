@@ -1103,6 +1103,81 @@ ipcMain.handle('draw:cabutJadwal', (e, keys) => {
   return removed;
 });
 
+// ----- paket hasil: dari laptop arena ke laptop panitia -----
+ipcMain.handle('draw:exportHasil', async (e) => {
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const brs = drawData.brackets.filter((b) => (b.results && Object.keys(b.results).length) || (b.wd && b.wd.length));
+  if (!brs.length) return { ok: false, msg: 'Belum ada hasil pertandingan di laptop ini.' };
+  const pk = {
+    format: 'dss-hasil',
+    version: 1,
+    eventUid: ensureUid(),
+    createdAt: Date.now(),
+    event: drawData.event,
+    classes: drawData.classes.filter((c) => brs.some((b) => b.classId === c.id)),
+    brackets: brs,
+  };
+  const arenas = [...new Set(brs.map((b) => b.arena).filter(Boolean))].sort((a, b) => a - b).join('-');
+  const r = await dialog.showSaveDialog(parent, {
+    defaultPath: `Hasil-Arena-${arenas || 'X'}.dss-hasil.json`,
+    filters: [{ name: 'Hasil DSS', extensions: ['json'] }],
+  });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePath) return { ok: false, msg: '' };
+  try {
+    fs.writeFileSync(r.filePath, JSON.stringify(pk, null, 1));
+    shell.showItemInFolder(r.filePath);
+    const n = brs.reduce((s, b) => s + Object.keys(b.results || {}).length, 0);
+    return { ok: true, msg: `Hasil disimpan: ${brs.length} kelas, ${n} pertandingan.` };
+  } catch (err) {
+    return { ok: false, msg: 'Gagal menyimpan: ' + err.message };
+  }
+});
+
+ipcMain.handle('draw:importHasil', async (e, overwrite) => {
+  const parent = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showOpenDialog(parent, { properties: ['openFile'], filters: [{ name: 'Hasil DSS', extensions: ['json'] }] });
+  if (parent) parent.focus();
+  if (r.canceled || !r.filePaths.length) return { ok: false, msg: '' };
+  try {
+    const raw = fs.readFileSync(r.filePaths[0], 'utf8');
+    if (raw.length > 20 * 1024 * 1024) return { ok: false, msg: 'File terlalu besar untuk hasil DSS.' };
+    const pk = JSON.parse(raw);
+    if (!pk || pk.format !== 'dss-hasil' || pk.version !== 1 || !pk.eventUid) return { ok: false, msg: 'Bukan file hasil DSS yang valid.' };
+    if (!drawData.eventUid || drawData.eventUid !== clean(pk.eventUid, 40)) {
+      return { ok: false, msg: 'Hasil ini berasal dari event lain, atau laptop ini belum punya bagan event ini.' };
+    }
+    const inc = sanitizeDraw({ event: drawData.event, classes: [], participants: [], brackets: pk.brackets, drawLog: [] });
+    let updated = 0;
+    let same = 0;
+    let older = 0;
+    let mismatch = 0;
+    for (const b of inc.brackets) {
+      const loc = drawData.brackets.find((x) => x.classId === b.classId);
+      const sameBracket = loc && loc.seed === b.seed && loc.size === b.size
+        && loc.slots.every((s, k) => (s ? s.id : 0) === (b.slots[k] ? b.slots[k].id : 0));
+      if (!sameBracket) { mismatch++; continue; }
+      const nIn = Object.keys(b.results).length;
+      const nLoc = Object.keys(loc.results || {}).length;
+      if (nIn < nLoc && !overwrite) { older++; continue; }
+      if (JSON.stringify(loc.results || {}) === JSON.stringify(b.results) && JSON.stringify(loc.wd || []) === JSON.stringify(b.wd)) { same++; continue; }
+      loc.results = b.results;
+      loc.wd = b.wd;
+      updated++;
+    }
+    let msg = `${updated} kelas diperbarui`;
+    if (same) msg += `, ${same} sudah sama`;
+    if (older) msg += `, ${older} dilewati (hasil di laptop ini lebih banyak; centang "Timpa" bila paket ini yang benar)`;
+    if (mismatch) msg += `, ${mismatch} dilewati (bagan tidak cocok dengan milik laptop ini)`;
+    msg += '.';
+    drawData.drawLog.push({ t: Date.now(), text: `Impor hasil: ${updated} diperbarui, ${same} sama, ${older} lebih lama, ${mismatch} tidak cocok` });
+    saveDraw();
+    return { ok: true, data: drawData, msg };
+  } catch (err) {
+    return { ok: false, msg: 'Gagal membaca hasil: ' + err.message };
+  }
+});
+
 let drawWin = null;
 ipcMain.on('openDraw', () => {
   if (drawWin && !drawWin.isDestroyed()) {

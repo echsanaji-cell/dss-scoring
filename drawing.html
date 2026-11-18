@@ -21,6 +21,7 @@
   [hidden] { display: none !important; }
   #tab-bagan table { max-width: 1000px; }
   #tab-arena table { max-width: 1100px; }
+  #tab-klasemen table { max-width: 1100px; }
   .bracket-box { margin-top: 8px; overflow: auto; max-height: 70vh; background: #10151b; border-radius: 8px; padding: 12px; }
   #bWarn { white-space: pre-wrap; font-size: 13px; margin: 6px 0; }
   .log { max-width: 1000px; font-size: 13px; line-height: 1.7; opacity: .85; }
@@ -41,6 +42,7 @@
     <button class="tab" data-tab="peserta">Peserta</button>
     <button class="tab" data-tab="bagan">Bagan</button>
     <button class="tab" data-tab="arena">Arena &amp; Nomor</button>
+    <button class="tab" data-tab="klasemen">Klasemen</button>
     <button class="tab" data-tab="paket">Paket</button>
   </div>
 
@@ -169,6 +171,30 @@
     </table>
   </section>
 
+  <!-- TAB KLASEMEN -->
+  <section id="tab-klasemen" hidden>
+    <h2>Klasemen kontingen</h2>
+    <div class="row">
+      <label>Urutan
+        <select id="kMode">
+          <option value="poin">Poin WT (1 masuk + 1 menang + 120/50/20 medali)</option>
+          <option value="medali">Perolehan medali (emas, perak, perunggu)</option>
+        </select>
+      </label>
+    </div>
+    <div id="kInfo" class="muted"></div>
+    <table>
+      <thead><tr><th style="width:90px">Peringkat</th><th>Kontingen</th><th>Emas</th><th>Perak</th><th>Perunggu</th><th>Atlet</th><th>Menang</th><th>Poin</th></tr></thead>
+      <tbody id="kBody"></tbody>
+    </table>
+    <h2>Medali per kelas</h2>
+    <table>
+      <thead><tr><th>Kelas</th><th style="width:90px">Progres</th><th>🥇 Emas</th><th>🥈 Perak</th><th>🥉 Perunggu</th><th>🥉 Perunggu</th></tr></thead>
+      <tbody id="kClass"></tbody>
+    </table>
+    <p class="muted">Perunggu diberikan kepada dua atlet yang kalah di semifinal (kelas 3 atlet: satu perunggu; kelas 2 atlet: tanpa perunggu). Atlet yang mundur sebelum pernah bertanding tidak dihitung masuk arena dan tidak mendapat medali. Pada klasemen Poin WT, kemenangan karena bye dan WDR dihitung.</p>
+  </section>
+
   <!-- TAB PAKET -->
   <section id="tab-paket" hidden>
     <h2>Ekspor paket arena (laptop panitia)</h2>
@@ -184,6 +210,13 @@
       <label><input id="pkOver" type="checkbox" style="width:auto"> Timpa kelas yang sudah ada</label>
     </div>
     <div id="pkMsg" class="muted"></div>
+    <h2>Hasil pertandingan (arena → panitia)</h2>
+    <div class="row">
+      <button id="btnHsExport">📤 Ekspor hasil</button>
+      <button id="btnHsImport">📥 Impor hasil</button>
+      <label><input id="hsOver" type="checkbox" style="width:auto"> Timpa walau hasil di laptop ini lebih banyak</label>
+    </div>
+    <p class="muted">Di laptop arena: ekspor hasil, lalu salin ke laptop panitia. Di laptop panitia: impor hasil agar bagan dan klasemen ikut ter-update. Hanya diterima untuk event yang sama dan bagan yang identik.</p>
     <h2>Event baru</h2>
     <div class="row"><button id="btnPkReset" class="danger">Hapus semua data Drawing</button></div>
     <p class="muted">Untuk memulai event baru, atau mengosongkan laptop arena sebelum mengimpor paket dari event lain. Tidak bisa dibatalkan.</p>
@@ -233,7 +266,7 @@ function twoClick(btn, action) {
 document.querySelectorAll('.tab').forEach((b) => {
   b.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === b));
-    for (const name of ['event', 'kelas', 'peserta', 'bagan', 'arena', 'paket']) $('tab-' + name).hidden = name !== b.dataset.tab;
+    for (const name of ['event', 'kelas', 'peserta', 'bagan', 'arena', 'klasemen', 'paket']) $('tab-' + name).hidden = name !== b.dataset.tab;
   });
 });
 
@@ -1105,7 +1138,54 @@ ipcRenderer.on('draw:changed', (e, d) => {
   render();
 });
 
-function render() { renderEvent(); renderKelas(); renderPeserta(); renderBagan(); renderArena(); renderPaket(); refreshSent(); }
+// ===== KLASEMEN: medali per kelas dan klasemen kontingen =====
+function renderKlasemen() {
+  const brs = data.brackets.filter((b) => data.classes.some((c) => c.id === b.classId));
+  const rows = BR.standings(brs, $('kMode').value || 'poin');
+  const cell = (tr, v) => { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); };
+  const body = $('kBody');
+  body.textContent = '';
+  rows.forEach((t) => {
+    const tr = document.createElement('tr');
+    [(t.tie ? '= ' : '') + t.rank, t.name, t.gold, t.silver, t.bronze, t.entered, t.wins, t.points].forEach((v) => cell(tr, v));
+    body.appendChild(tr);
+  });
+  $('kInfo').textContent = !rows.length ? 'Belum ada bagan.'
+    : rows.some((t) => t.tie) ? 'Tanda "=" berarti seri sempurna; kriteria berikutnya (poin di kelas yang lebih berat) diputuskan manual.' : '';
+
+  const cb = $('kClass');
+  cb.textContent = '';
+  data.classes.forEach((c) => {
+    const b = data.brackets.find((x) => x.classId === c.id);
+    if (!b) return;
+    const m = BR.medals(b);
+    const total = bracketMatches(b).length;
+    const done = Object.keys(b.results || {}).length;
+    const tr = document.createElement('tr');
+    const nm = (e) => (e ? (e.club ? `${e.name} · ${e.club}` : e.name) : '—');
+    cell(tr, c.name);
+    cell(tr, m.done ? 'Selesai' : `${done}/${total}`);
+    cell(tr, m.done ? nm(m.gold) : '');
+    cell(tr, m.done ? nm(m.silver) : '');
+    cell(tr, m.done ? nm(m.bronze[0]) : '');
+    cell(tr, m.done && b.size > 2 ? nm(m.bronze[1]) : '');
+    cb.appendChild(tr);
+  });
+}
+$('kMode').addEventListener('change', renderKlasemen);
+
+// ----- hasil: arena -> panitia -----
+$('btnHsExport').onclick = async () => {
+  const r = await ipcRenderer.invoke('draw:exportHasil');
+  if (r.msg) $('pkMsg').textContent = r.msg;
+};
+$('btnHsImport').onclick = async () => {
+  const r = await ipcRenderer.invoke('draw:importHasil', $('hsOver').checked);
+  if (r.data) { data = r.data; render(); }
+  if (r.msg) $('pkMsg').textContent = r.msg;
+};
+
+function render() { renderEvent(); renderKelas(); renderPeserta(); renderBagan(); renderArena(); renderPaket(); renderKlasemen(); refreshSent(); }
 
 (async () => {
   data = await ipcRenderer.invoke('draw:get');

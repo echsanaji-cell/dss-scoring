@@ -138,5 +138,93 @@ function champion(b) {
   return res ? res.winner : null;
 }
 
-const api = { key, roundsOf, forEachMatch, isPlayed, entries, setResult, clearResult, autoAdvance, markWd, unmarkWd, readyMatches, eliminated, champion };
+// atlet yang benar-benar bertanding (hasil sungguhan, bukan WDR otomatis)
+function playedIds(b) {
+  const set = new Set();
+  forEachMatch(b, (r, i) => {
+    const res = b.results && b.results[key(r, i)];
+    if (!res || res.auto) return;
+    entries(b, r, i).forEach((e) => { if (e) set.add(e.id); });
+  });
+  return set;
+}
+
+// atlet yang mundur (WDR) sebelum pernah bertanding dianggap tidak masuk arena: tidak dapat poin masuk maupun medali
+function enteredSet(b) {
+  const played = playedIds(b);
+  const wd = new Set(b.wd || []);
+  const set = new Set();
+  b.slots.filter(Boolean).forEach((s) => { if (!wd.has(s.id) || played.has(s.id)) set.add(s.id); });
+  return set;
+}
+
+// medali satu bagan: emas = juara, perak = kalah di final, perunggu = dua yang kalah di semifinal
+function medals(b) {
+  const rounds = roundsOf(b);
+  const out = { done: false, gold: null, silver: null, bronze: [] };
+  const fin = b.results && b.results[key(rounds - 1, 0)];
+  if (!fin) return out;
+  out.done = true;
+  const entered = enteredSet(b);
+  const ok = (e) => (e && entered.has(e.id) ? e : null);
+  const [f1, f2] = entries(b, rounds - 1, 0);
+  out.gold = ok(fin.winner);
+  out.silver = ok([f1, f2].find((e) => e && e.id !== fin.winner.id) || null);
+  if (rounds >= 2) {
+    for (let i = 0; i < 2; i++) {
+      const res = b.results && b.results[key(rounds - 2, i)];
+      if (!res) continue; // pasangan babak 1 berisi bye tidak punya kalah
+      const loser = ok(entries(b, rounds - 2, i).find((e) => e && e.id !== res.winner.id) || null);
+      if (loser) out.bronze.push(loser);
+    }
+  }
+  return out;
+}
+
+// klasemen kontingen menurut WT Competition Rules (Interpretation, Team Standing):
+// 1 poin per atlet yang masuk arena, 1 poin per kemenangan (bye dan WDR dihitung), +120 emas, +50 perak, +20 perunggu
+// mode 'poin': urut poin, lalu emas, perak, perunggu, jumlah atlet; mode 'medali': urut emas, perak, perunggu, lalu poin
+function standings(brackets, mode) {
+  const teams = new Map();
+  const team = (club) => {
+    const name = String(club || '').trim() || '(tanpa kontingen)';
+    const k = name.toLowerCase();
+    if (!teams.has(k)) teams.set(k, { name, gold: 0, silver: 0, bronze: 0, entered: 0, wins: 0, points: 0 });
+    return teams.get(k);
+  };
+  brackets.forEach((b) => {
+    const entered = enteredSet(b);
+    b.slots.filter(Boolean).forEach((s) => { if (entered.has(s.id)) team(s.club).entered++; });
+    for (let i = 0; i < b.size / 2; i++) { // menang karena bye
+      const a = b.slots[2 * i];
+      const c = b.slots[2 * i + 1];
+      const w = a && !c ? a : !a && c ? c : null;
+      if (w && entered.has(w.id)) team(w.club).wins++;
+    }
+    Object.values(b.results || {}).forEach((res) => { if (res.winner) team(res.winner.club).wins++; });
+    const m = medals(b);
+    if (m.gold) team(m.gold.club).gold++;
+    if (m.silver) team(m.silver.club).silver++;
+    m.bronze.forEach((e) => team(e.club).bronze++);
+  });
+  const rows = [...teams.values()];
+  rows.forEach((t) => { t.points = t.entered + t.wins + 120 * t.gold + 50 * t.silver + 20 * t.bronze; });
+  const keyOf = (t) => (mode === 'medali' ? [t.gold, t.silver, t.bronze, t.points, t.entered] : [t.points, t.gold, t.silver, t.bronze, t.entered]);
+  const cmp = (a, c) => {
+    const ka = keyOf(a);
+    const kc = keyOf(c);
+    for (let i = 0; i < ka.length; i++) if (ka[i] !== kc[i]) return kc[i] - ka[i];
+    return a.name.localeCompare(c.name);
+  };
+  rows.sort(cmp);
+  rows.forEach((t, i) => {
+    const prev = rows[i - 1];
+    const same = prev && keyOf(prev).join() === keyOf(t).join();
+    t.rank = same ? prev.rank : i + 1;
+    t.tie = !!same || (rows[i + 1] && keyOf(rows[i + 1]).join() === keyOf(t).join());
+  });
+  return rows;
+}
+
+const api = { key, roundsOf, forEachMatch, isPlayed, entries, setResult, clearResult, autoAdvance, markWd, unmarkWd, readyMatches, eliminated, champion, playedIds, enteredSet, medals, standings };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
