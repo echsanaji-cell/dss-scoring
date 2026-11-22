@@ -83,7 +83,7 @@ body {
   justify-content: center;
   gap: 3vh;
 }
-.label { font-size: 3.5vh; font-weight: 700; letter-spacing: .2vw; }
+.label { font-size: 5.0vh; font-weight: 700; letter-spacing: .2vw; }
 .timer {
   background: #ffeb00;
   color: #000;
