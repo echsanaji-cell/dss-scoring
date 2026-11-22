@@ -20,6 +20,7 @@ const settings = {
   consensusMs: 1000, // jendela waktu konsensus juri (milidetik)
   eventName: '',     // nama event, tampil di scoreboard
 };
+const DEFAULT_SETTINGS = { ...settings }; // nilai awal, dipakai tombol Reset pengaturan
 try { Object.assign(settings, JSON.parse(fs.readFileSync(settingsFile, 'utf8'))); } catch (e) {}
 function saveSettings() {
   try { fs.writeFileSync(settingsFile, JSON.stringify(settings)); } catch (e) {}
@@ -87,8 +88,8 @@ function newMatch() {
   return {
     category: 'Male -58 kg',
     matchNo: '001',
-    chung: { name: 'Hassan Idman', country: 'IRI' },
-    hong: { name: 'James Stuart', country: 'GBR' },
+    chung: { name: 'Budi Santoso', country: 'INA' },
+    hong: { name: 'Andi Pratama', country: 'INA' },
     round: 1,
     phase: 'waiting', // waiting | running | paused | rest | tie | kyeshi | ivr | ended
     timeLeft: settings.roundTime,
@@ -672,6 +673,16 @@ function handle(type, p = {}) {
     case 'setSettings':
       if ('eventName' in p) p.eventName = clean(p.eventName, 80);
       Object.assign(settings, p);
+      saveSettings();
+      if (state.phase === 'waiting') {
+        state.timeLeft = settings.roundTime;
+        if (state.round === 1) state.ivr = { chung: settings.ivrQuota, hong: settings.ivrQuota };
+      }
+      checkRound();
+      break;
+    case 'resetSettings': // kembalikan semua pengaturan ke nilai awal (untuk kejuaraan baru)
+      Object.keys(settings).forEach((k) => delete settings[k]);
+      Object.assign(settings, DEFAULT_SETTINGS);
       saveSettings();
       if (state.phase === 'waiting') {
         state.timeLeft = settings.roundTime;

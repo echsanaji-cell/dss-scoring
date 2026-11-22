@@ -137,7 +137,7 @@ body.operator {
 
 .op-top { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
 .op-top #category { flex: 1; }
-.op-clock { display: flex; gap: 28px; align-items: center; justify-content: center; margin-bottom: 12px; font-size: 22px; font-weight: 700; }
+.op-clock { display: flex; gap: 28px; align-items: center; justify-content: center; margin-bottom: 12px; font-size: 18px; font-weight: 700; }
 .op-timer { background: #ffeb00; color: #000; padding: 4px 20px; border-radius: 5px; font-size: 35px; line-height: 1.1; min-width: 85px; text-align: center; font-variant-numeric: tabular-nums; }
 body[data-phase="paused"] .op-timer { background: #ff9800; }
 body[data-phase="rest"] .op-timer { background: #00e676; }

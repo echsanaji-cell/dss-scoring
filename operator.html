@@ -110,6 +110,11 @@
             <select id="sJudge"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
           </label>
         </div>
+        <h4>Reset</h4>
+        <div class="row">
+          <button id="btnSetReset">↺ Reset pengaturan ke awal</button>
+          <span class="muted" style="font-size:12px">untuk kejuaraan baru</span>
+        </div>
         <h4>Pintasan keyboard</h4>
         <div class="muted" style="font-size:12px;line-height:1.6">
           Spasi = Shijak / Kal-yeo<br>
@@ -559,6 +564,19 @@
     $('menuDraw').onclick = () => ipcRenderer.send('openDraw');
     $('btnScoreboard').onclick = () => ipcRenderer.send('openScoreboard');
     $('btnWhistleTest').onclick = () => send('whistleTest');
+    // reset pengaturan: dua klik (window.confirm bermasalah di Windows)
+    let resetArmed = false;
+    $('btnSetReset').onclick = () => {
+      if (!resetArmed) {
+        resetArmed = true;
+        $('btnSetReset').textContent = 'Klik lagi: kembalikan semua pengaturan ke awal?';
+        setTimeout(() => { resetArmed = false; $('btnSetReset').textContent = '↺ Reset pengaturan ke awal'; }, 3000);
+      } else {
+        resetArmed = false;
+        $('btnSetReset').textContent = '↺ Reset pengaturan ke awal';
+        send('resetSettings');
+      }
+    };
     $('btnReverse').onclick = () => send('reverse');
     $('btnFinish').onclick = () => send('finish');
     $('btnReopen').onclick = () => send('reopen');
