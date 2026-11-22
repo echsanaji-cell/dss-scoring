@@ -183,6 +183,23 @@
       return actx;
     }
 
+    // Derau sangat pelan yang terus berputar, supaya perangkat audio (terutama HDMI / monitor) tidak "tertidur"
+    // dan peluit atau bel tidak terlambat bunyi. Ubah ke 0 untuk menonaktifkan.
+    const KEEPALIVE_LEVEL = 0.0005;
+    function startKeepAlive() {
+      if (!KEEPALIVE_LEVEL) return;
+      const ac = audio();
+      const buf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * KEEPALIVE_LEVEL;
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.connect(ac.destination);
+      src.start();
+    }
+    window.addEventListener('load', startKeepAlive);
+
     // Peluit wasit: dua nada tinggi bergetar + desis napas
     function playWhistle() {
       const ac = audio();
@@ -230,7 +247,7 @@
     }
 
     // Bel: pukulan logam dengan nada sisa yang tidak harmonis
-    // decay = lama gema (detik). Bel ronde habis 2.2, bel hitung mundur istirahat 0.8
+    // decay = lama gema (detik). Bel 10 detik terakhir 2.2, bel hitung mundur istirahat 0.8
     function playBell(decay) {
       const ac = audio();
       const t0 = ac.currentTime;
@@ -257,11 +274,11 @@
     // pendeteksi kejadian suara: bandingkan state lama dan baru
     function handleSounds(prev, st) {
       if (!prev) return;
-      // 1. peluit saat timer ronde masuk di bawah 10 detik
+      // 1. bel saat timer ronde masuk di bawah 10 detik (tepat di 9,9)
       if (prev.phase === 'running' && st.phase === 'running' && st.round === prev.round &&
-          prev.timeLeft >= 10 && st.timeLeft < 10) playWhistle();
-      // 2. bel saat waktu ronde habis
-      if (prev.phase === 'running' && st.phase === 'timeUp') playBell(2.2);
+          prev.timeLeft >= 10 && st.timeLeft < 10) playBell(2.2);
+      // 2. peluit saat waktu ronde habis (0:00)
+      if (prev.phase === 'running' && st.phase === 'timeUp') playWhistle();
       // 3. bel tiap detik di 5 detik terakhir waktu istirahat
       if (st.phase === 'rest' && st.timeLeft >= 1 && st.timeLeft <= 5 &&
           (prev.phase !== 'rest' || prev.timeLeft !== st.timeLeft)) playBell(0.8);
