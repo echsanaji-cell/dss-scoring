@@ -132,17 +132,17 @@
     <span class="joy-warn" id="joyWarn"></span>
   </div>
 
-  <!-- Info pertandingan -->
-  <div class="op-top">
-    <input id="category" placeholder="Kategori (mis. Male -58 kg)">
-    <input id="matchNo" class="short" placeholder="No">
-  </div>
-
-  <!-- Jam pertandingan: di tengah, tepat di atas dua sisi -->
-  <div class="op-clock">
-    <span id="phase"></span>
+  <!-- Pita status: warnanya berubah menurut fase. Kiri: kelas dan nomor, tengah: timer, kanan: fase dan ronde -->
+  <div class="op-band">
+    <div class="op-top">
+      <input id="category" placeholder="Kategori (mis. Male -58 kg)">
+      <input id="matchNo" class="short" placeholder="No">
+    </div>
     <span class="op-timer" id="timer">2:00</span>
-    <span id="round"></span>
+    <div class="op-state">
+      <span id="phase"></span>
+      <span id="round"></span>
+    </div>
   </div>
 
   <!-- Dua sisi: dibuat lewat JS di bawah -->

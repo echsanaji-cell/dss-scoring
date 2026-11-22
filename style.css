@@ -135,14 +135,26 @@ body.operator {
 }
 .operator button:hover { filter: brightness(1.25); }
 
-.op-top { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+.op-top { display: flex; gap: 10px; align-items: center; }
 .op-top #category { flex: 1; }
-.op-clock { display: flex; gap: 28px; align-items: center; justify-content: center; margin-bottom: 12px; font-size: 18px; font-weight: 700; }
-.op-timer { background: #ffeb00; color: #000; padding: 4px 20px; border-radius: 5px; font-size: 35px; line-height: 1.1; min-width: 85px; text-align: center; font-variant-numeric: tabular-nums; }
-body[data-phase="paused"] .op-timer { background: #ff9800; }
-body[data-phase="rest"] .op-timer { background: #00e676; }
 
-.op-main { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* pita status: warnanya berubah menurut fase supaya terbaca sekilas dari sudut mata */
+.op-band { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 10px 14px; margin-bottom: 12px; border-radius: 12px; background: #37474f; color: #fff; transition: background-color .15s; }
+.op-timer { font-size: 64px; font-weight: 800; line-height: 1; padding: 0 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.op-state { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-weight: 700; }
+.op-state #phase { font-size: 22px; }
+.op-state #round { font-size: 16px; }
+body[data-phase="running"]  .op-band { background: #ffeb00; color: #000; }
+body[data-phase="paused"]   .op-band { background: #ff9800; color: #000; }
+body[data-phase="rest"]     .op-band { background: #00e676; color: #000; }
+body[data-phase="timeUp"]   .op-band { background: #c62828; color: #fff; }
+body[data-phase="roundEnd"] .op-band { background: #2e7d32; color: #fff; }
+body[data-phase="tie"]      .op-band { background: #8e24aa; color: #fff; }
+body[data-phase="kyeshi"]   .op-band { background: #e53935; color: #fff; }
+body[data-phase="ivr"]      .op-band { background: #00838f; color: #fff; }
+
+.op-main { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.op-main > .op-side { grid-column: span 2; }
 .op-side { border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .op-side.chung { background: #0d47a1; }
 .op-side.hong  { background: #b71c1c; }
