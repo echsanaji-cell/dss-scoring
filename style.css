@@ -137,8 +137,8 @@ body.operator {
 
 .op-top { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
 .op-top #category { flex: 1; }
-.op-status { display: flex; gap: 14px; align-items: center; font-weight: 700; }
-.op-timer { background: #ffeb00; color: #000; padding: 4px 14px; border-radius: 6px; font-size: 26px; }
+.op-clock { display: flex; gap: 28px; align-items: center; justify-content: center; margin-bottom: 12px; font-size: 22px; font-weight: 700; }
+.op-timer { background: #ffeb00; color: #000; padding: 4px 20px; border-radius: 5px; font-size: 35px; line-height: 1.1; min-width: 85px; text-align: center; font-variant-numeric: tabular-nums; }
 body[data-phase="paused"] .op-timer { background: #ff9800; }
 body[data-phase="rest"] .op-timer { background: #00e676; }
 
@@ -372,12 +372,12 @@ body.minus .op-head::after { content: '  ·  MODE KURANG'; color: #ffeb3b; }
 .sched-cur td { background: #1b3a5c; }
 .sched-list button { padding: 4px 8px; font-size: 12px; }
 
-/* tukar sisi biru/merah (scoreboard dan operator) */
+/* tukar sisi biru/merah: hanya scoreboard. Panel operator tetap (merah kiri, biru kanan) agar cocok dengan pintasan keyboard */
 body.rev .main > .side.chung { order: 3; }
 body.rev .main > .side.hong { order: 1; }
 body.rev .main > :not(.side) { order: 2; }
-body.rev .op-main > .op-side.chung { order: 2; }
-body.rev .op-main > .op-side.hong { order: 1; }
+.op-main > .op-side.chung { order: 2; }
+.op-main > .op-side.hong { order: 1; }
 
 /* ikon hit tetap di tepi luar layar: panel kiri = ikon di kiri, panel kanan = ikon di kanan (tidak ikut tukar sisi) */
 body.rev .side.chung .hits { left: auto; right: 1vw; flex-wrap: wrap-reverse; }

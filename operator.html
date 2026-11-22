@@ -113,15 +113,16 @@
         <h4>Pintasan keyboard</h4>
         <div class="muted" style="font-size:12px;line-height:1.6">
           Spasi = Shijak / Kal-yeo<br>
-          Chung: Q W E = +1 +2 +3 · R / T = teknikal badan +2 / kepala +3<br>
-          Hong: Y U I = +1 +2 +3 · O / P = teknikal badan +2 / kepala +3<br>
-          G / H = Gam-jeom Chung / Hong · Z = Undo
+          Hong (merah, panel kiri, tangan kiri): Q W E = +1 +2 +3 · R / T = teknikal badan +2 / kepala +3<br>
+          Chung (biru, panel kanan, tangan kanan): Y U I = +1 +2 +3 · O / P = teknikal badan +2 / kepala +3<br>
+          G / H = Gam-jeom Hong / Chung · Z = Undo<br>
+          Posisi panel operator dan pintasan tidak berubah saat Tukar sisi (hanya scoreboard yang tertukar)
         </div>
       </div>
     </div>
 
     <button class="b-dev" id="btnScoreboard">🖥 Tampilkan Scoreboard</button>
-    <button class="b-dev" id="btnReverse">⇄ Tukar sisi</button>
+    <button class="b-dev" id="btnReverse">⇄ Tukar sisi scoreboard</button>
     <span class="joy-msg" id="joyMsg"></span>
     <span class="joy-warn" id="joyWarn"></span>
   </div>
@@ -130,11 +131,13 @@
   <div class="op-top">
     <input id="category" placeholder="Kategori (mis. Male -58 kg)">
     <input id="matchNo" class="short" placeholder="No">
-    <div class="op-status">
-      <span id="phase"></span>
-      <span id="round"></span>
-      <span class="op-timer" id="timer">2:00</span>
-    </div>
+  </div>
+
+  <!-- Jam pertandingan: di tengah, tepat di atas dua sisi -->
+  <div class="op-clock">
+    <span id="phase"></span>
+    <span class="op-timer" id="timer">2:00</span>
+    <span id="round"></span>
   </div>
 
   <!-- Dua sisi: dibuat lewat JS di bawah -->
@@ -388,7 +391,6 @@
       const i = st.round - 1;
       const scoring = st.phase === 'running' || st.phase === 'paused' || st.phase === 'timeUp';
       document.body.dataset.phase = st.phase;
-      document.body.classList.toggle('rev', !!(st.settings && st.settings.reversed));
 
       setVal('category', st.category);
       setVal('matchNo', st.matchNo);
@@ -1035,12 +1037,12 @@
     }, 300);
 
     // ===== PINTASAN KEYBOARD =====
-    // Chung (biru): Q +1, W +2, E +3, R +4 (putar badan), T +6 (putar kepala)
-    // Hong (merah): Y +1, U +2, I +3, O +4 (putar badan), P +6 (putar kepala)
-    // G = Gam-jeom Chung, H = Gam-jeom Hong, Z = Undo, Spasi = Shijak / Kal-yeo
+    // Hong (merah, panel kiri, tangan kiri): Q +1, W +2, E +3, R teknikal badan, T teknikal kepala
+    // Chung (biru, panel kanan, tangan kanan): Y +1, U +2, I +3, O teknikal badan, P teknikal kepala
+    // G = Gam-jeom Hong, H = Gam-jeom Chung, Z = Undo, Spasi = Shijak / Kal-yeo
     const KEYS = {
-      q: ['chung', 'punch'], w: ['chung', 'trunk'], e: ['chung', 'head'], r: ['chung', 'tech:trunk'], t: ['chung', 'tech:head'],
-      y: ['hong', 'punch'], u: ['hong', 'trunk'], i: ['hong', 'head'], o: ['hong', 'tech:trunk'], p: ['hong', 'tech:head'],
+      q: ['hong', 'punch'], w: ['hong', 'trunk'], e: ['hong', 'head'], r: ['hong', 'tech:trunk'], t: ['hong', 'tech:head'],
+      y: ['chung', 'punch'], u: ['chung', 'trunk'], i: ['chung', 'head'], o: ['chung', 'tech:trunk'], p: ['chung', 'tech:head'],
     };
     document.addEventListener('keydown', (e) => {
       const ae = document.activeElement;
@@ -1055,8 +1057,8 @@
         if (kt.startsWith('tech:')) pressTechnical(ksd, kt.slice(5), false);
         else send('score', { side: ksd, tech: kt });
       }
-      else if (k === 'g') send('gj', { side: 'chung', passive: false });
-      else if (k === 'h') send('gj', { side: 'hong', passive: false });
+      else if (k === 'g') send('gj', { side: 'hong', passive: false });
+      else if (k === 'h') send('gj', { side: 'chung', passive: false });
       else if (k === 'z') send('undo');
       else handled = false;
       if (handled) {
