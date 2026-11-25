@@ -754,7 +754,8 @@
         closeMenus(panel.classList.contains('hidden') ? panel : null);
       });
     });
-    document.addEventListener('click', (e) => { if (!e.target.closest('.dd')) closeMenus(null); });
+    // composedPath() dihitung saat klik terjadi, jadi tetap benar walau tombol yang diklik sudah dibuang dari halaman (mis. daftar jadwal digambar ulang)
+    document.addEventListener('click', (e) => { if (!e.composedPath().some((n) => n.classList && n.classList.contains('dd'))) closeMenus(null); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenus(null); });
     $('btnSetTime').onclick = () => send('setTime', {
       seconds: (Number($('tMin').value) || 0) * 60 + (Number($('tSec').value) || 0),
