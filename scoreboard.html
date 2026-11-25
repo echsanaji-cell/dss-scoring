@@ -103,6 +103,7 @@
   <script>
     const { ipcRenderer } = require('electron');
     const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const fmt = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     let last = null;
     let sync = null;
@@ -363,7 +364,7 @@
           ov.innerHTML =
             `<div class="ov-title">MATCH ${st.matchNo} RESULT</div>` +
             `<div class="ov-win">WINNER</div>` +
-            `<div class="ov-name">${w.name} (${w.country})</div>` +
+            `<div class="ov-name">${esc(w.name)} (${esc(w.country)})</div>` +
             (code ? `<div class="ov-code">${cname} (${code})</div>` : '') +
             scoreTable(st) +
             (rc + rh > 0 ? `<div class="ov-rounds">ROUNDS ${rc} – ${rh}</div>` : '');
@@ -374,7 +375,7 @@
         ov.className = 'overlay ' + w;
         ov.innerHTML =
           `<div class="ov-title">ROUND ${st.round} WINNER</div>` +
-          `<div class="ov-name">${p.name} (${p.country})</div>` +
+          `<div class="ov-name">${esc(p.name)} (${esc(p.country)})</div>` +
           `<div class="rw-score">${st.points.chung[i]} – ${st.points.hong[i]}</div>`;
       } else if (st.phase === 'tie' && st.tie.stage === 'summary') {
         // tabel ringkasan tiebreaker, tampil 2 detik

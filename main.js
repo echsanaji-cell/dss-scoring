@@ -672,6 +672,7 @@ function handle(type, p = {}) {
 
     case 'setSettings':
       if ('eventName' in p) p.eventName = clean(p.eventName, 80);
+      for (const k of Object.keys(p)) if (!(k in DEFAULT_SETTINGS)) delete p[k]; // hanya kunci pengaturan yang dikenal
       Object.assign(settings, p);
       saveSettings();
       if (state.phase === 'waiting') {
