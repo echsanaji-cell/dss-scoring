@@ -250,6 +250,16 @@
       $('last').textContent = '';
     };
 
+    // ----- receiver ESP32 (diteruskan dari jendela operator) -----
+    const { ipcRenderer } = require('electron');
+    const serialLit = [null, null, null]; // per juri: { 'sisi:teknik': batas waktu titik menyala }
+    ipcRenderer.on('serialPress', (e, { j, side, tech }) => {
+      if (!serialLit[j]) serialLit[j] = {};
+      serialLit[j][side + ':' + tech] = Date.now() + 250;
+      log(`ESP32 Juri ${j + 1}: ${side}:${tech}`);
+      comboPress('ESP32 J' + (j + 1), side, tech);
+    });
+
     // ----- baca joystick -----
     const prev = {};
     function frame() {
@@ -258,10 +268,12 @@
 
       for (let n = 0; n < 3; n++) {
         const p = pads[n];
-        $('j' + n).classList.toggle('off', !p);
-        $('jl' + n).textContent = p ? `Juri ${n + 1} · indeks ${p.index}` : `Juri ${n + 1} · tidak terdeteksi`;
+        const esp = serialLit[n];
+        $('j' + n).classList.toggle('off', !p && !esp);
+        $('jl' + n).textContent = esp ? `Juri ${n + 1} · ESP32` : p ? `Juri ${n + 1} · indeks ${p.index}` : `Juri ${n + 1} · tidak terdeteksi`;
         const lit = new Set();
         if (p) p.buttons.forEach((b, bi) => { if (b.pressed && btnMap[bi]) lit.add(btnMap[bi]); });
+        if (esp) Object.keys(esp).forEach((k) => { if (Date.now() < esp[k]) lit.add(k); });
         for (const side of ['chung', 'hong']) {
           for (const k of KINDS) $(`d${n}-${side}-${k}`).classList.toggle('on', lit.has(side + ':' + k));
         }

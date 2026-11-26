@@ -977,6 +977,7 @@
       const j = Number(m[1]) - 1;
       if (j < 0 || j >= judgeTotal()) return;
       serialShow('Tersambung · terakhir: ' + line);
+      ipcRenderer.send('serialPress', { j, side: m[2].toLowerCase(), tech: SERIAL_TECH[m[3]] });
       if (roll && !roll.done) return; // saat Cek Juri tidak dihitung
       comboPress(j, m[2].toLowerCase(), SERIAL_TECH[m[3]]);
     }
