@@ -60,6 +60,11 @@
           <button class="b-joy" id="btnJoyChk">📣 Cek Juri</button>
         </div>
         <div id="joyStat"></div>
+        <h4>Receiver ESP32 (USB)</h4>
+        <div class="row">
+          <button class="b-joy" id="btnSerial">🔌 Sambungkan</button>
+        </div>
+        <div id="serialStat">Belum tersambung</div>
         <h4>Diagnosa</h4>
         <div class="row">
           <button class="b-dev" id="btnDev">🎮 Tes Perangkat</button>
@@ -957,6 +962,64 @@
     setInterval(pollPads, 15);
     setInterval(joyShow, 500);
     joyShow();
+
+    // ===== RECEIVER ESP32 (Web Serial) =====
+    // baris dari receiver: "J1 Chung +1 #12 RSSI=-60"
+    const SERIAL_LINE = /^J(\d+) (Chung|Hong) \+([123]) #\d+/;
+    const SERIAL_TECH = { 1: 'punch', 2: 'trunk', 3: 'head' };
+    let serialReader = null; // terisi selama tersambung
+
+    const serialShow = (t) => { $('serialStat').textContent = t; };
+
+    function serialLine(line) {
+      const m = SERIAL_LINE.exec(line);
+      if (!m) return; // statistik dan pesan lain diabaikan
+      const j = Number(m[1]) - 1;
+      if (j < 0 || j >= judgeTotal()) return;
+      serialShow('Tersambung · terakhir: ' + line);
+      if (roll && !roll.done) return; // saat Cek Juri tidak dihitung
+      comboPress(j, m[2].toLowerCase(), SERIAL_TECH[m[3]]);
+    }
+
+    async function serialConnect() {
+      const btn = $('btnSerial');
+      let port;
+      btn.disabled = true;
+      try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+      } catch (e) {
+        return serialShow(e.name === 'NotFoundError' ? 'Receiver tidak ditemukan' : 'Port tidak bisa dibuka (tutup Serial Monitor)');
+      } finally {
+        btn.disabled = false;
+      }
+      try {
+        // DTR dan RTS mati supaya board ESP32 tidak tertahan reset
+        await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+        serialReader = port.readable.getReader();
+        btn.textContent = '⏏ Putuskan';
+        serialShow('Tersambung, menunggu tombol...');
+        const decoder = new TextDecoder();
+        let buf = '';
+        for (;;) {
+          const { value, done } = await serialReader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();
+          lines.forEach((l) => serialLine(l.trim()));
+        }
+      } catch (e) {
+        console.error(e); // misalnya kabel USB dicabut
+      }
+      if (serialReader) serialReader.releaseLock();
+      serialReader = null;
+      try { await port.close(); } catch (e) {}
+      btn.textContent = '🔌 Sambungkan';
+      serialShow('Terputus');
+    }
+
+    $('btnSerial').onclick = () => (serialReader ? serialReader.cancel() : serialConnect());
 
     // ===== HASIL KHUSUS + RECORD PAPER =====
     const RESULT_NAME = {

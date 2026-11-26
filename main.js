@@ -1635,6 +1635,13 @@ app.whenReady().then(() => {
   openScoreboard();
   operatorWin = createWindow('operator.html', { x: 80, y: 60, width: 1100, height: 760 });
   operatorWin.on('closed', () => app.quit()); // pertandingan tersimpan otomatis dan dipulihkan saat dibuka lagi
+  // receiver joystick ESP32 (Web Serial): pilih otomatis chip USB-serial CP210x atau CH340
+  operatorWin.webContents.session.on('select-serial-port', (e, ports, wc, callback) => {
+    e.preventDefault();
+    console.log('port serial:', ports.map((p) => `${p.portName} vid=${p.vendorId}`));
+    const port = ports.find((p) => [0x10c4, 0x1a86].includes(Number(p.vendorId)));
+    callback(port ? port.portId : '');
+  });
   // layar HDMI dicolok / dicabut / berubah resolusi
   const { screen } = require('electron');
   ['display-added', 'display-removed', 'display-metrics-changed'].forEach((ev) => {
