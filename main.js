@@ -1548,6 +1548,10 @@ ipcMain.handle('results:export', async (e) => {
 });
 ipcMain.on('cmd', (e, type, payload) => handle(type, payload));
 // tombol dari receiver ESP32 diteruskan ke Tes Perangkat (port serial dipegang jendela operator)
+// status tes perangkat dari operator diteruskan ke scoreboard
+ipcMain.on('testState', (e, s) => {
+  BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('testState', s));
+});
 ipcMain.on('serialPress', (e, p) => {
   BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('serialPress', p));
 });

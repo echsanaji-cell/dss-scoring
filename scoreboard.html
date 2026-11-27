@@ -99,6 +99,7 @@
   </div>
 
   <div id="overlay" class="overlay hidden"></div>
+  <div id="deviceTest" class="devtest-screen hidden"></div>
 
   <script>
     const { ipcRenderer } = require('electron');
@@ -418,6 +419,43 @@
 
     ipcRenderer.invoke('getState').then(render);
     ipcRenderer.on('state', (e, st) => render(st));
+
+    // ===== TES PERANGKAT JURI (dinyalakan dari operator) =====
+    const TEST_PTS = { punch: 1, trunk: 2, head: 3 };
+    const testLit = [{}, {}, {}]; // per juri: { 'sisi:teknik': batas waktu menyala }
+    const testCount = [0, 0, 0];
+    const testLast = ['', '', ''];
+    let testInfo = { on: false, judges: [] };
+
+    function testDraw() {
+      const box = document.getElementById('deviceTest');
+      box.classList.toggle('hidden', !testInfo.on);
+      if (!testInfo.on) return;
+      const now = Date.now();
+      const cards = testInfo.judges.map((g, j) => {
+        const rows = ['chung', 'hong'].map((side) => '<div class="dt-row">' + Object.keys(TEST_PTS).map((t) =>
+          `<span class="dt-dot ${side}${testLit[j][side + ':' + t] > now ? ' on' : ''}">+${TEST_PTS[t]}</span>`).join('') + '</div>').join('');
+        const status = !g ? '-' : !g.paired ? 'BELUM DIPASANGKAN' : g.online ? 'TERHUBUNG' : 'PUTUS';
+        return `<div class="dt-card"><div class="dt-name">JURI ${j + 1}</div>
+          <div class="dt-status ${g && g.online ? 'ok' : 'no'}">${status}</div>${rows}
+          <div class="dt-last">${testLast[j] || '-'}</div><div class="dt-count">Tekanan: ${testCount[j]}</div></div>`;
+      }).join('');
+      box.innerHTML = `<div class="dt-title">TES PERANGKAT JURI</div><div class="dt-cards">${cards}</div>`;
+    }
+
+    ipcRenderer.on('testState', (e, s) => {
+      if (s.on && !testInfo.on) { testCount.fill(0); testLast.fill(''); }
+      testInfo = s;
+      testDraw();
+    });
+    ipcRenderer.on('serialPress', (e, { j, side, tech }) => {
+      if (!testInfo.on) return;
+      testLit[j][side + ':' + tech] = Date.now() + 400;
+      testLast[j] = `${side.toUpperCase()} +${TEST_PTS[tech]}`;
+      testCount[j]++;
+      testDraw();
+      setTimeout(testDraw, 420);
+    });
 
     // ===== TOMBOL TES (di jendela scoreboard) =====
     const send = (type, payload) => ipcRenderer.send('cmd', type, payload);
