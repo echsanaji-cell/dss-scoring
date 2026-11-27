@@ -53,18 +53,29 @@
     <div class="dd">
       <button id="menuJoy">🎮 Joystick ▾</button>
       <div class="menu-panel hidden">
-        <h4>Joystick juri</h4>
-        <div class="row">
-          <button class="b-joy" id="btnJoyReg">🎮 Daftar Juri</button>
-          <button class="b-joy" id="btnJoyMap">🎚 Atur Tombol</button>
-          <button class="b-joy" id="btnJoyChk">📣 Cek Juri</button>
-        </div>
-        <div id="joyStat"></div>
+
         <h4>Receiver ESP32 (USB)</h4>
         <div class="row">
           <button class="b-joy" id="btnSerial">🔌 Sambungkan</button>
         </div>
         <div id="serialStat">Belum tersambung</div>
+        <div class="row"><span class="rx-judge" id="rxJ0">Juri 1: -</span><button class="b-joy" id="pairBtn0" disabled>Pasangkan</button></div>
+        <div class="row"><span class="rx-judge" id="rxJ1">Juri 2: -</span><button class="b-joy" id="pairBtn1" disabled>Pasangkan</button></div>
+        <div class="row"><span class="rx-judge" id="rxJ2">Juri 3: -</span><button class="b-joy" id="pairBtn2" disabled>Pasangkan</button></div>
+        <div id="pairMsg"></div>
+        <div class="row">
+          <button class="b-joy" id="btnPairClear" disabled>🗑 Hapus semua pairing</button>
+        </div>
+        <label class="chk-old"><input type="checkbox" id="chkOldJoy"> Pakai joystick lama (cadangan)</label>
+        <div id="oldJoyBox" class="hidden">
+          <h4>Joystick lama</h4>
+          <div class="row">
+            <button class="b-joy" id="btnJoyReg">🎮 Daftar Juri</button>
+            <button class="b-joy" id="btnJoyMap">🎚 Atur Tombol</button>
+            <button class="b-joy" id="btnJoyChk">📣 Cek Juri</button>
+          </div>
+          <div id="joyStat"></div>
+        </div>
         <h4>Diagnosa</h4>
         <div class="row">
           <button class="b-dev" id="btnDev">🎮 Tes Perangkat</button>
@@ -826,6 +837,8 @@
     const prevBtn = {};
     let flashT;
     let roll = null; // hasil Cek Juri: { until, ok: [nomor juri], done }
+    let oldJoy = false; // joystick lama (Gamepad API) hanya aktif bila dicentang
+    try { oldJoy = localStorage.getItem('dss.oldJoy') === '1'; } catch (e) {}
 
     const judgeLabel = (j) => 'Juri ' + (j + 1);
     const judgeTotal = () => (last && last.settings.judgeCount) || 1;
@@ -833,6 +846,11 @@
     function endMode() { joyMode = null; $('joyMsg').textContent = ''; }
 
     function joyShow() {
+      if (!oldJoy) {
+        $('joyWarn').textContent = '';
+        $('focusBanner').classList.remove('on');
+        return;
+      }
       if (joyMode && joyMode.type === 'reg') {
         $('joyMsg').textContent = `Tekan tombol apa saja di joystick ${judgeLabel(joyMode.n)}...`;
       } else if (joyMode && joyMode.type === 'map') {
@@ -938,6 +956,7 @@
     }
 
     function pollPads() {
+      if (!oldJoy) return;
       const pads = (navigator.getGamepads ? Array.from(navigator.getGamepads()) : []).filter(Boolean);
       for (const p of pads) {
         const was = prevBtn[p.index] || [];
@@ -959,6 +978,18 @@
     window.addEventListener('gamepadconnected', () => joyShow());
     window.addEventListener('blur', () => setTimeout(joyShow, 50));
     window.addEventListener('focus', () => setTimeout(joyShow, 50));
+    function oldJoyApply() {
+      $('chkOldJoy').checked = oldJoy;
+      $('oldJoyBox').classList.toggle('hidden', !oldJoy);
+      if (!oldJoy) { endMode(); roll = null; }
+      joyShow();
+    }
+    $('chkOldJoy').onchange = () => {
+      oldJoy = $('chkOldJoy').checked;
+      try { localStorage.setItem('dss.oldJoy', oldJoy ? '1' : '0'); } catch (e) {}
+      oldJoyApply();
+    };
+    oldJoyApply();
     setInterval(pollPads, 15);
     setInterval(joyShow, 500);
     joyShow();
@@ -972,6 +1003,7 @@
     const serialShow = (t) => { $('serialStat').textContent = t; };
 
     function serialLine(line) {
+      pairLine(line);
       const m = SERIAL_LINE.exec(line);
       if (!m) return; // statistik dan pesan lain diabaikan
       const j = Number(m[1]) - 1;
@@ -981,6 +1013,69 @@
       if (roll && !roll.done) return; // saat Cek Juri tidak dihitung
       comboPress(j, m[2].toLowerCase(), SERIAL_TECH[m[3]]);
     }
+
+    // ----- pairing dan status juri (firmware sketch_receiver_pair) -----
+    let serialWriter = null;
+    let listTimer = null;
+    let pairingSlot = 0; // 0 = tidak sedang pairing, 1-3 = juri yang menunggu controller
+    const rxJudge = [null, null, null]; // null = belum diketahui, atau { paired, online }
+
+    function serialSend(cmd) {
+      if (serialWriter) serialWriter.write(new TextEncoder().encode(cmd + '\n')).catch(() => {});
+    }
+
+    const roundRunning = () => !!last && last.phase === 'running';
+    const setText = (id, t) => { if ($(id).textContent !== t) $(id).textContent = t; };
+
+    function pairShow() {
+      for (let i = 0; i < 3; i++) {
+        const g = rxJudge[i];
+        setText('rxJ' + i, `Juri ${i + 1}: ` + (!g ? '-' : !g.paired ? 'kosong' : g.online ? '🟢 terhubung' : '🔴 putus'));
+        setText('pairBtn' + i, pairingSlot === i + 1 ? 'Batal' : 'Pasangkan');
+        $('pairBtn' + i).disabled = !serialWriter || roundRunning() || (pairingSlot !== 0 && pairingSlot !== i + 1);
+      }
+      $('btnPairClear').disabled = !serialWriter || roundRunning();
+    }
+
+    function pairLine(line) {
+      const list = /^Juri ([123]): (.+)$/.exec(line); // jawaban perintah LIST
+      if (list) {
+        rxJudge[list[1] - 1] = { paired: list[2] !== 'kosong', online: list[2].endsWith('(terhubung)') };
+        return pairShow();
+      }
+      if (!line.startsWith('[pair] ')) return;
+      let text = line.slice(7);
+      const wait = /^Juri ([123]): menunggu/.exec(text);
+      if (wait) {
+        pairingSlot = Number(wait[1]);
+        text = `Juri ${pairingSlot}: nyalakan controller, lalu dalam 8 detik tahan Chung +1 dan Hong +1 sampai LED berkedip cepat. Waktu 30 detik.`;
+      } else if (/terpasang|GAGAL|waktu habis|dibatalkan|dihapus/.test(text)) {
+        pairingSlot = 0;
+        serialSend('LIST');
+      }
+      $('pairMsg').textContent = text;
+      pairShow();
+    }
+
+    for (let i = 0; i < 3; i++) {
+      $('pairBtn' + i).onclick = () => serialSend(pairingSlot === i + 1 ? 'BATAL' : 'PAIR ' + (i + 1));
+    }
+
+    // hapus semua pairing: dua klik
+    let clearTimer = null;
+    $('btnPairClear').onclick = () => {
+      const armed = clearTimer !== null;
+      clearTimeout(clearTimer);
+      clearTimer = null;
+      $('btnPairClear').textContent = armed ? '🗑 Hapus semua pairing' : 'Klik lagi: hapus semua pairing?';
+      if (armed) return serialSend('HAPUS');
+      clearTimer = setTimeout(() => { clearTimer = null; $('btnPairClear').textContent = '🗑 Hapus semua pairing'; }, 3000);
+    };
+
+    setInterval(() => {
+      if (pairingSlot && roundRunning()) serialSend('BATAL'); // pairing terkunci saat ronde berjalan
+      pairShow();
+    }, 500);
 
     async function serialConnect() {
       const btn = $('btnSerial');
@@ -998,6 +1093,8 @@
         // DTR dan RTS mati supaya board ESP32 tidak tertahan reset
         await port.setSignals({ dataTerminalReady: false, requestToSend: false });
         serialReader = port.readable.getReader();
+        serialWriter = port.writable.getWriter();
+        listTimer = setInterval(() => serialSend('LIST'), 2000); // segarkan status juri
         btn.textContent = '⏏ Putuskan';
         serialShow('Tersambung, menunggu tombol...');
         const decoder = new TextDecoder();
@@ -1013,6 +1110,13 @@
       } catch (e) {
         console.error(e); // misalnya kabel USB dicabut
       }
+      clearInterval(listTimer);
+      if (serialWriter) serialWriter.releaseLock();
+      serialWriter = null;
+      pairingSlot = 0;
+      rxJudge.fill(null);
+      $('pairMsg').textContent = '';
+      pairShow();
       if (serialReader) serialReader.releaseLock();
       serialReader = null;
       try { await port.close(); } catch (e) {}
